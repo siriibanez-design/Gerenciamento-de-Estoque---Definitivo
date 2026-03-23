@@ -1,0 +1,5 @@
+{
+  "name": "Estoque Municipal",
+  "description": "Sistema de Gestão de Estoque Municipal para controle de entradas, saídas, planejamento de compras e relatórios.",
+  "requestFramePermissions": []
+}
