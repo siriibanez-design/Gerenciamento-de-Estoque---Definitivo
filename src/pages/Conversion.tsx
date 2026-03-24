@@ -56,7 +56,8 @@ export default function Conversion() {
         category: formData.category,
         current: 0,
         minStock: 0,
-        target: 0
+        target: 0,
+        unitPrice: 0
       });
     }
     setIsModalOpen(false);
@@ -107,7 +108,7 @@ export default function Conversion() {
         <table className="w-full text-left border-collapse">
           <thead className="bg-slate-50">
             <tr className="border-b border-slate-200">
-              <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-wider text-xs w-1/3">Item do Sistema</th>
+              <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-wider text-xs w-1/2">Item do Sistema</th>
               <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-wider text-xs w-1/3">Código Vinculado</th>
               <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-wider text-xs text-center">Ações</th>
             </tr>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Plus, Phone, Mail, ChevronDown, ChevronRight, FileText, Users, Package, Trash2, X, Edit2 } from 'lucide-react';
+import { Search, Plus, Phone, Mail, ChevronDown, ChevronRight, FileText, Users, Package, Trash2, X, Edit2, XCircle, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useInventory } from '../context/InventoryContext';
 
@@ -27,59 +27,16 @@ interface Process {
   suppliers: Supplier[];
 }
 
-const initialProcesses: Process[] = [
-  {
-    id: '1',
-    number: '2024/001',
-    description: 'Aquisição de Materiais de Escritório - Semestre 1',
-    suppliers: [
-      {
-        id: 's1',
-        name: 'Papelaria Central Ltda',
-        email: 'vendas@papelariacentral.com',
-        phone: '(11) 4002-8922',
-        items: [
-          { id: 'i1', number: '01', description: 'Papel A4 75g (Resma)', value: 28.50 },
-          { id: 'i2', number: '02', description: 'Caneta Esferográfica Azul (Un)', value: 1.50 },
-        ]
-      },
-      {
-        id: 's2',
-        name: 'Distribuidora Alvorada',
-        email: 'comercial@alvorada.com.br',
-        phone: '(11) 3322-1100',
-        items: [
-          { id: 'i3', number: '01', description: 'Papel A4 75g (Resma)', value: 27.90 },
-        ]
-      }
-    ]
-  },
-  {
-    id: '2',
-    number: '2024/015',
-    description: 'Manutenção de Equipamentos de TI',
-    suppliers: [
-      {
-        id: 's3',
-        name: 'Informática & Cia',
-        email: 'suporte@infocia.com',
-        phone: '(11) 5544-3322',
-        items: [
-          { id: 'i4', number: '10', description: 'SSD 480GB SATA III', value: 245.00 },
-          { id: 'i5', number: '11', description: 'Memória RAM 8GB DDR4', value: 189.00 },
-        ]
-      }
-    ]
-  }
-];
+const initialProcesses: Process[] = [];
 
 export default function Suppliers({ isSubPage = false }: { isSubPage?: boolean }) {
-  const { items: inventoryItems } = useInventory();
-  const [processes, setProcesses] = useState<Process[]>(initialProcesses);
-  const [expandedProcesses, setExpandedProcesses] = useState<string[]>(['1']);
+  const { items: inventoryItems, processes, updateProcesses } = useInventory();
+  const [expandedProcesses, setExpandedProcesses] = useState<string[]>([]);
   const [expandedSuppliers, setExpandedSuppliers] = useState<string[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProcessId, setEditingProcessId] = useState<string | null>(null);
+  const [processToDelete, setProcessToDelete] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
   // Form State
   const [newProcess, setNewProcess] = useState({
@@ -101,6 +58,7 @@ export default function Suppliers({ isSubPage = false }: { isSubPage?: boolean }
   };
 
   const handleOpenModal = (process?: Process) => {
+    setFormError(null);
     if (process) {
       setEditingProcessId(process.id);
       setNewProcess({
@@ -116,10 +74,13 @@ export default function Suppliers({ isSubPage = false }: { isSubPage?: boolean }
   };
 
   const handleAddProcess = () => {
-    if (!newProcess.number || !newProcess.description) return;
+    if (!newProcess.number || !newProcess.description) {
+      setFormError('Por favor, preencha o número e a descrição do processo.');
+      return;
+    }
     
     if (editingProcessId) {
-      setProcesses(prev => prev.map(p => 
+      updateProcesses(processes.map(p => 
         p.id === editingProcessId 
           ? { ...p, ...newProcess }
           : p
@@ -129,7 +90,7 @@ export default function Suppliers({ isSubPage = false }: { isSubPage?: boolean }
         id: Math.random().toString(36).substr(2, 9),
         ...newProcess
       };
-      setProcesses([process, ...processes]);
+      updateProcesses([process, ...processes]);
     }
     
     setIsModalOpen(false);
@@ -139,8 +100,13 @@ export default function Suppliers({ isSubPage = false }: { isSubPage?: boolean }
 
   const handleDeleteProcess = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    if (window.confirm('Deseja realmente excluir este processo?')) {
-      setProcesses(prev => prev.filter(p => p.id !== id));
+    setProcessToDelete(id);
+  };
+
+  const confirmDeleteProcess = () => {
+    if (processToDelete) {
+      updateProcesses(processes.filter(p => p.id !== processToDelete));
+      setProcessToDelete(null);
     }
   };
 
@@ -372,6 +338,11 @@ export default function Suppliers({ isSubPage = false }: { isSubPage?: boolean }
               </div>
 
               <div className="p-6 overflow-y-auto flex-1 space-y-6">
+                {formError && (
+                  <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm font-bold flex items-center gap-2">
+                    <XCircle className="w-4 h-4" /> {formError}
+                  </div>
+                )}
                 {/* Process Info */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="md:col-span-1">
@@ -559,6 +530,44 @@ export default function Suppliers({ isSubPage = false }: { isSubPage?: boolean }
                 >
                   Salvar Processo
                 </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {processToDelete && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200"
+            >
+              <div className="p-8 text-center space-y-6">
+                <div className="w-20 h-20 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto">
+                  <Trash2 className="w-10 h-10" />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-2xl font-black text-slate-900 tracking-tight">Excluir Processo?</h3>
+                  <p className="text-slate-500 text-sm">
+                    Deseja realmente excluir este processo de compra? Esta ação não poderá ser desfeita.
+                  </p>
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <button 
+                    onClick={() => setProcessToDelete(null)}
+                    className="flex-1 py-3 rounded-xl bg-slate-100 text-slate-700 font-bold text-sm hover:bg-slate-200 transition-all flex items-center justify-center gap-2"
+                  >
+                    <X className="w-4 h-4" /> Cancelar
+                  </button>
+                  <button 
+                    onClick={confirmDeleteProcess}
+                    className="flex-1 py-3 rounded-xl bg-red-600 text-white font-bold text-sm shadow-lg shadow-red-600/20 hover:bg-red-700 transition-all flex items-center justify-center gap-2"
+                  >
+                    <Check className="w-4 h-4" /> Confirmar Exclusão
+                  </button>
+                </div>
               </div>
             </motion.div>
           </div>

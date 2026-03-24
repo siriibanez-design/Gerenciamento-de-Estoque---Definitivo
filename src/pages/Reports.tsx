@@ -1,37 +1,56 @@
-import React, { useState } from 'react';
-import { Search, ClipboardList, Plus, AlertTriangle, Info, X, Filter, ChevronRight, Package, Target, AlertCircle, Edit2, Trash2, FileText } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Search, ClipboardList, Plus, AlertTriangle, Info, X, Filter, ChevronRight, ChevronUp, ChevronDown, Package, Target, AlertCircle, Edit2, Trash2, FileText } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useInventory } from '../context/InventoryContext';
 
 export default function Reports() {
-  const { items, categories, addItem, updateItem, deleteItem, addCategory } = useInventory();
+  const { items, categories, addItem, updateItem, deleteItem, addCategory, updateCategory, deleteCategory } = useInventory();
   const [selectedCategory, setSelectedCategory] = useState('TODOS');
   const [searchTerm, setSearchTerm] = useState('');
   
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [isItemModalOpen, setIsItemModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDeleteCategoryModalOpen, setIsDeleteCategoryModalOpen] = useState(false);
   const [isFilterVisible, setIsFilterVisible] = useState(false);
   
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingCategory, setEditingCategory] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
+  const [adjustment, setAdjustment] = useState('');
   
   const [newCategory, setNewCategory] = useState('');
   const [newItem, setNewItem] = useState({
     item: '',
-    category: categories[0] || '',
+    category: '',
     code: '',
     current: '',
     minStock: '',
     target: ''
   });
 
+  useEffect(() => {
+    if (!newItem.category && categories.length > 0) {
+      const firstRealCategory = categories.find(c => c !== 'TODOS') || categories[0];
+      setNewItem(prev => ({ ...prev, category: firstRealCategory }));
+    }
+  }, [categories]);
+
   const handleCreateCategory = (e: React.FormEvent) => {
     e.preventDefault();
     if (newCategory) {
-      addCategory(newCategory);
+      if (editingCategory) {
+        updateCategory(editingCategory, newCategory);
+        if (selectedCategory === editingCategory) {
+          setSelectedCategory(newCategory);
+        }
+        setEditingCategory(null);
+      } else {
+        addCategory(newCategory);
+      }
       setNewCategory('');
       setIsCategoryModalOpen(false);
     }
@@ -40,10 +59,12 @@ export default function Reports() {
   const handleSaveItem = (e: React.FormEvent) => {
     e.preventDefault();
     
+    const itemCategory = newItem.category || (categories.find(c => c !== 'TODOS') || categories[0]);
+    
     if (editingId !== null) {
       updateItem(editingId, {
         item: newItem.item,
-        category: newItem.category,
+        category: itemCategory,
         code: newItem.code,
         current: parseInt(newItem.current),
         minStock: parseInt(newItem.minStock),
@@ -53,16 +74,17 @@ export default function Reports() {
     } else {
       addItem({
         item: newItem.item,
-        category: newItem.category,
+        category: itemCategory,
         code: newItem.code,
         current: parseInt(newItem.current),
         minStock: parseInt(newItem.minStock),
-        target: parseInt(newItem.target)
+        target: parseInt(newItem.target),
+        unitPrice: 0
       });
     }
     
     setIsItemModalOpen(false);
-    setNewItem({ item: '', category: categories[0] || '', current: '', minStock: '', target: '' });
+    setNewItem({ item: '', category: categories.find(c => c !== 'TODOS') || categories[0], code: '', current: '', minStock: '', target: '' });
   };
 
   const handleEdit = (item: any) => {
@@ -74,6 +96,7 @@ export default function Reports() {
       minStock: item.minStock.toString(),
       target: item.target.toString()
     });
+    setAdjustment('');
     setEditingId(item.id);
     setIsItemModalOpen(true);
   };
@@ -91,8 +114,19 @@ export default function Reports() {
     }
   };
 
+  const handleDeleteCategory = () => {
+    if (categoryToDelete) {
+      deleteCategory(categoryToDelete);
+      if (selectedCategory === categoryToDelete) {
+        setSelectedCategory('TODOS');
+      }
+      setIsDeleteCategoryModalOpen(false);
+      setCategoryToDelete(null);
+    }
+  };
+
   const handleExportPDF = () => {
-    const doc = new jsPDF();
+    const doc = new jsPDF('l', 'mm', 'a4');
     
     doc.setFontSize(18);
     doc.text('Relatório de Estoque', 14, 22);
@@ -100,22 +134,41 @@ export default function Reports() {
     doc.setTextColor(100);
     doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, 14, 30);
     
-    const tableData = filteredItems.map(r => [
-      r.code || '-',
-      r.item,
-      r.category,
-      r.current.toString(),
-      r.minStock.toString(),
-      r.target.toString(),
-      `${Math.round((r.current / r.target) * 100)}%`
-    ]);
+    const tableData = filteredItems.map(r => {
+      const tetoUsagePercentage = r.target > 0 ? Math.min(100, (r.totalOut / r.target) * 100) : 0;
+      const remainingTeto = r.target - r.totalOut;
+      const ratio = r.minStock > 0 ? (r.current / r.minStock).toFixed(2) : '0.00';
+
+      return [
+        r.code || '-',
+        r.item,
+        r.category,
+        r.current.toString(),
+        r.minStock.toString(),
+        r.in || '0',
+        r.out || '0',
+        r.target.toString(),
+        `${remainingTeto} (${Math.round(tetoUsagePercentage)}%)`,
+        ratio
+      ];
+    });
 
     autoTable(doc, {
-      head: [['Código', 'Item', 'Categoria', 'Estoque Atual', 'Estoque Mínimo', 'Teto', 'Capacidade']],
+      head: [['CÓDIGO', 'ITEM', 'CATEGORIA', 'ESTOQ. ATUAL', 'ESTOQ. MÍN.', 'ENTRADAS', 'SAÍDAS', 'TETO', 'FALTA TETO', 'ATUAL/MÍN']],
       body: tableData,
       startY: 40,
       theme: 'striped',
-      headStyles: { fillColor: [0, 74, 153] }
+      headStyles: { fillColor: [0, 74, 153], fontSize: 8 },
+      styles: { fontSize: 8 },
+      columnStyles: {
+        3: { halign: 'center' },
+        4: { halign: 'center' },
+        5: { halign: 'center' },
+        6: { halign: 'center' },
+        7: { halign: 'center' },
+        8: { halign: 'center' },
+        9: { halign: 'right' }
+      }
     });
 
     doc.save(`relatorio_estoque_${new Date().getTime()}.pdf`);
@@ -214,13 +267,37 @@ export default function Reports() {
           TODOS
         </button>
         {categories.map(cat => (
-          <button 
-            key={cat}
-            onClick={() => setSelectedCategory(cat)}
-            className={`px-4 py-2 rounded-full text-xs font-bold transition-all whitespace-nowrap ${selectedCategory === cat ? 'bg-[#004a99] text-white shadow-md shadow-[#004a99]/20' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}
-          >
-            {cat.toUpperCase()}
-          </button>
+          <div key={cat} className="relative group flex-shrink-0">
+            <button 
+              onClick={() => setSelectedCategory(cat)}
+              className={`px-4 py-2 rounded-full text-xs font-bold transition-all whitespace-nowrap pr-14 ${selectedCategory === cat ? 'bg-[#004a99] text-white shadow-md shadow-[#004a99]/20' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+            >
+              {cat.toUpperCase()}
+            </button>
+            <div className={`absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 transition-all opacity-0 group-hover:opacity-100`}>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setEditingCategory(cat);
+                  setNewCategory(cat);
+                  setIsCategoryModalOpen(true);
+                }}
+                className={`p-0.5 rounded-full transition-all ${selectedCategory === cat ? 'text-white/70 hover:text-white hover:bg-white/20' : 'text-slate-400 hover:text-[#004a99] hover:bg-slate-100'}`}
+              >
+                <Edit2 className="w-3 h-3" />
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCategoryToDelete(cat);
+                  setIsDeleteCategoryModalOpen(true);
+                }}
+                className={`p-0.5 rounded-full transition-all ${selectedCategory === cat ? 'text-white/70 hover:text-white hover:bg-white/20' : 'text-slate-400 hover:text-rose-500 hover:bg-rose-50'}`}
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          </div>
         ))}
       </div>
 
@@ -320,8 +397,12 @@ export default function Reports() {
               className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200"
             >
               <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                <h3 className="text-lg font-black text-slate-900 tracking-tight">Criar Categoria</h3>
-                <button onClick={() => setIsCategoryModalOpen(false)} className="p-2 hover:bg-slate-200 rounded-lg transition-colors text-slate-400">
+                <h3 className="text-lg font-black text-slate-900 tracking-tight">{editingCategory ? 'Editar Categoria' : 'Criar Categoria'}</h3>
+                <button onClick={() => {
+                  setIsCategoryModalOpen(false);
+                  setEditingCategory(null);
+                  setNewCategory('');
+                }} className="p-2 hover:bg-slate-200 rounded-lg transition-colors text-slate-400">
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -338,7 +419,7 @@ export default function Reports() {
                   />
                 </div>
                 <button type="submit" className="w-full py-3 rounded-xl bg-[#004a99] text-white font-bold text-sm shadow-lg shadow-[#004a99]/20 hover:bg-[#004a99]/90 transition-all">
-                  Criar Categoria
+                  {editingCategory ? 'Salvar Alterações' : 'Criar Categoria'}
                 </button>
               </form>
             </motion.div>
@@ -380,7 +461,7 @@ export default function Reports() {
                       onChange={(e) => setNewItem({...newItem, category: e.target.value})}
                       className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-[#004a99] outline-none transition-all text-sm font-medium bg-white"
                     >
-                      {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                      {categories.filter(c => c !== 'TODOS').map(cat => <option key={cat} value={cat}>{cat}</option>)}
                     </select>
                   </div>
                   <div className="space-y-2 col-span-2">
@@ -405,6 +486,46 @@ export default function Reports() {
                       type="number" 
                     />
                   </div>
+
+                  {editingId !== null && (
+                    <div className="space-y-2 col-span-2 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Ajuste Rápido</label>
+                      <div className="flex items-center gap-3">
+                        <input 
+                          value={adjustment}
+                          onChange={(e) => setAdjustment(e.target.value)}
+                          placeholder="Qtd."
+                          className="w-24 px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-[#004a99] outline-none transition-all text-sm font-medium"
+                          type="number" 
+                        />
+                        <div className="flex gap-2">
+                          <button 
+                            type="button"
+                            onClick={() => {
+                              const adj = parseInt(adjustment) || 0;
+                              setNewItem(prev => ({ ...prev, current: (Math.max(0, parseInt(prev.current || '0') - adj)).toString() }));
+                            }}
+                            className="p-2 bg-white border border-slate-200 rounded-lg hover:bg-rose-50 hover:text-rose-600 transition-all shadow-sm flex items-center gap-1"
+                          >
+                            <ChevronDown className="w-4 h-4" />
+                            <span className="text-xs font-bold">Subtrair</span>
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => {
+                              const adj = parseInt(adjustment) || 0;
+                              setNewItem(prev => ({ ...prev, current: (parseInt(prev.current || '0') + adj).toString() }));
+                            }}
+                            className="p-2 bg-white border border-slate-200 rounded-lg hover:bg-emerald-50 hover:text-emerald-600 transition-all shadow-sm flex items-center gap-1"
+                          >
+                            <ChevronUp className="w-4 h-4" />
+                            <span className="text-xs font-bold">Adicionar</span>
+                          </button>
+                        </div>
+                      </div>
+                      <p className="text-[10px] text-slate-400 italic mt-2">Digite um valor e use os botões para ajustar o estoque atual.</p>
+                    </div>
+                  )}
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Estoque Mínimo</label>
                     <input 
@@ -462,6 +583,43 @@ export default function Reports() {
                   </button>
                   <button 
                     onClick={handleDelete}
+                    className="flex-1 py-3 rounded-xl bg-rose-600 text-white font-bold text-sm shadow-lg shadow-rose-600/20 hover:bg-rose-700 transition-all"
+                  >
+                    Excluir
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {isDeleteCategoryModalOpen && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200"
+            >
+              <div className="p-8 text-center space-y-4">
+                <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto">
+                  <AlertTriangle className="w-8 h-8" />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-xl font-black text-slate-900 tracking-tight">Excluir Categoria?</h3>
+                  <p className="text-slate-500 text-sm">
+                    Tem certeza que deseja excluir a categoria <strong>{categoryToDelete}</strong>? 
+                    Os itens desta categoria não serão excluídos, mas ficarão sem categoria associada.
+                  </p>
+                </div>
+                <div className="flex gap-3 pt-4">
+                  <button 
+                    onClick={() => setIsDeleteCategoryModalOpen(false)}
+                    className="flex-1 py-3 rounded-xl bg-slate-100 text-slate-700 font-bold text-sm hover:bg-slate-200 transition-all"
+                  >
+                    Cancelar
+                  </button>
+                  <button 
+                    onClick={handleDeleteCategory}
                     className="flex-1 py-3 rounded-xl bg-rose-600 text-white font-bold text-sm shadow-lg shadow-rose-600/20 hover:bg-rose-700 transition-all"
                   >
                     Excluir
