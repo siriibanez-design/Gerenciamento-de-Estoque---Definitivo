@@ -6,7 +6,7 @@ import autoTable from 'jspdf-autotable';
 import { useInventory } from '../context/InventoryContext';
 
 export default function Reports() {
-  const { items, categories, addItem, updateItem, deleteItem, addCategory, updateCategory, deleteCategory } = useInventory();
+  const { items, categories, addItem, updateItem, deleteItem, addCategory, updateCategory, deleteCategory, isCycleClosed } = useInventory();
   const [selectedCategory, setSelectedCategory] = useState('TODOS');
   const [searchTerm, setSearchTerm] = useState('');
   
@@ -194,24 +194,26 @@ export default function Reports() {
           <h2 className="font-black text-slate-900 tracking-tight text-4xl">Relatórios</h2>
           <p className="text-slate-600 mt-1 text-lg">Gerenciamento e monitoramento de fluxo de itens do estoque em tempo real</p>
         </div>
-        <div className="flex flex-wrap gap-3">
-          <button 
-            onClick={() => setIsCategoryModalOpen(true)}
-            className="px-4 py-2 bg-slate-100 text-slate-700 font-bold text-xs rounded-lg hover:bg-slate-200 transition-colors flex items-center gap-2"
-          >
-            <Plus className="w-4 h-4" /> Criar Categoria
-          </button>
-          <button 
-            onClick={() => {
-              setEditingId(null);
-              setNewItem({ item: '', category: categories[0], code: '', current: '', minStock: '', target: '' });
-              setIsItemModalOpen(true);
-            }}
-            className="px-4 py-2 bg-[#004a99] text-white font-bold text-xs rounded-lg hover:bg-[#004a99]/90 transition-colors flex items-center gap-2 shadow-sm shadow-[#004a99]/20"
-          >
-            <Plus className="w-4 h-4" /> Novo Item
-          </button>
-        </div>
+        {!isCycleClosed && (
+          <div className="flex flex-wrap gap-3">
+            <button 
+              onClick={() => setIsCategoryModalOpen(true)}
+              className="px-4 py-2 bg-slate-100 text-slate-700 font-bold text-xs rounded-lg hover:bg-slate-200 transition-colors flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" /> Criar Categoria
+            </button>
+            <button 
+              onClick={() => {
+                setEditingId(null);
+                setNewItem({ item: '', category: categories[0], code: '', current: '', minStock: '', target: '' });
+                setIsItemModalOpen(true);
+              }}
+              className="px-4 py-2 bg-[#004a99] text-white font-bold text-xs rounded-lg hover:bg-[#004a99]/90 transition-colors flex items-center gap-2 shadow-sm shadow-[#004a99]/20"
+            >
+              <Plus className="w-4 h-4" /> Novo Item
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Filter and Export Bar (Matching Movements style) */}
@@ -319,7 +321,7 @@ export default function Reports() {
                 <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-wider text-xs">Teto</th>
                 <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-wider text-center text-xs">Falta do Teto</th>
                 <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-wider text-right text-xs">Estoq. Atual / Mínimo</th>
-                <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-wider text-center text-xs">Ações</th>
+                {!isCycleClosed && <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-wider text-center text-xs">Ações</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -360,24 +362,26 @@ export default function Reports() {
                     <td className={`px-6 py-4 text-right font-bold text-[11px] ${status.color}`}>
                       {r.minStock > 0 ? (r.current / r.minStock).toFixed(2) : '0.00'}
                     </td>
-                    <td className="px-6 py-4 text-center">
-                      <div className="flex items-center justify-center gap-2">
-                        <button 
-                          onClick={() => handleEdit(r)}
-                          className="p-1.5 text-slate-400 hover:text-[#004a99] hover:bg-[#004a99]/10 rounded-lg transition-all"
-                          title="Alterar"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button 
-                          onClick={() => confirmDelete(r.id)}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
-                          title="Excluir"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
+                    {!isCycleClosed && (
+                      <td className="px-6 py-4 text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          <button 
+                            onClick={() => handleEdit(r)}
+                            className="p-1.5 text-slate-400 hover:text-[#004a99] hover:bg-[#004a99]/10 rounded-lg transition-all"
+                            title="Alterar"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button 
+                            onClick={() => confirmDelete(r.id)}
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                            title="Excluir"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 );
               })}

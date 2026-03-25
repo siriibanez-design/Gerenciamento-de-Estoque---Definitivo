@@ -1,14 +1,30 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Package, ArrowRight, Plus } from 'lucide-react';
 import { motion } from 'motion/react';
+import { useInventory } from '../context/InventoryContext';
 
 export default function Login() {
   const navigate = useNavigate();
+  const { setActiveCycle, cycles } = useInventory();
+  const [selectedMonth, setSelectedMonth] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
+  const [newMonthName, setNewMonthName] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    navigate('/dashboard');
+    if (selectedMonth) {
+      setActiveCycle(selectedMonth);
+      navigate('/management-dashboard');
+    }
+  };
+
+  const handleCreateMonth = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newMonthName) {
+      setActiveCycle(newMonthName);
+      navigate('/management-dashboard');
+    }
   };
 
   return (
@@ -30,51 +46,103 @@ export default function Login() {
             Bem-vindo ao Sistema de Gestão de Estoque Municipal
           </h2>
           <p className="mt-2 text-slate-500 text-sm">
-            Selecione o período de referência para prosseguir com o gerenciamento.
+            {isCreating 
+              ? 'Digite o nome do novo período (ex: Abril 2024)' 
+              : 'Selecione o período de referência para prosseguir com o gerenciamento.'}
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-slate-700 ml-1" htmlFor="mes-vigencia">
-              Mês de Vigência
-            </label>
-            <div className="relative">
-              <select 
-                className="w-full h-14 rounded-lg border-slate-200 bg-slate-50 text-slate-900 focus:border-[#339cff] focus:ring-2 focus:ring-[#339cff]/20 appearance-none px-4 transition-all" 
-                id="mes-vigencia"
-                required
-                defaultValue=""
-              >
-                <option value="" disabled>Selecione o mês</option>
-                <option value="jan-2024">Janeiro 2024</option>
-                <option value="fev-2024">Fevereiro 2024</option>
-                <option value="mar-2024">Março 2024</option>
-                <option value="abr-2024">Abril 2024</option>
-                <option value="mai-2024">Maio 2024</option>
-                <option value="jun-2024">Junho 2024</option>
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-400">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+        {!isCreating ? (
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium text-slate-700 ml-1" htmlFor="mes-vigencia">
+                Mês de Vigência
+              </label>
+              <div className="relative">
+                <select 
+                  className="w-full h-14 rounded-lg border-slate-200 bg-slate-50 text-slate-900 focus:border-[#339cff] focus:ring-2 focus:ring-[#339cff]/20 appearance-none px-4 transition-all" 
+                  id="mes-vigencia"
+                  required
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                >
+                  <option value="" disabled>Selecione o mês</option>
+                  {cycles.length > 0 ? (
+                    cycles.map(cycle => (
+                      <option key={cycle.id} value={cycle.id}>
+                        {cycle.id} {cycle.isClosed ? '(FECHADO)' : ''}
+                      </option>
+                    ))
+                  ) : (
+                    <>
+                      <option value="Janeiro 2024">Janeiro 2024</option>
+                      <option value="Fevereiro 2024">Fevereiro 2024</option>
+                      <option value="Março 2024">Março 2024</option>
+                    </>
+                  )}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-400">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="flex justify-end">
-            <button type="button" className="text-[#339cff] hover:text-[#339cff]/80 text-sm font-semibold flex items-center gap-1 transition-colors group">
-              <Plus className="w-4 h-4" />
-              <span>Criar Novo Período</span>
+            <div className="flex justify-end">
+              <button 
+                type="button" 
+                onClick={() => setIsCreating(true)}
+                className="text-[#339cff] hover:text-[#339cff]/80 text-sm font-semibold flex items-center gap-1 transition-colors group"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Criar Novo Período</span>
+              </button>
+            </div>
+
+            <button 
+              type="submit"
+              disabled={!selectedMonth}
+              className="w-full bg-[#339cff] hover:bg-[#339cff]/90 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-4 rounded-lg shadow-lg shadow-[#339cff]/20 transition-all flex items-center justify-center gap-2 group"
+            >
+              <span>Iniciar Acesso</span>
+              <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
             </button>
-          </div>
+          </form>
+        ) : (
+          <form onSubmit={handleCreateMonth} className="space-y-6">
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium text-slate-700 ml-1" htmlFor="novo-mes">
+                Nome do Período
+              </label>
+              <input 
+                type="text"
+                id="novo-mes"
+                placeholder="Ex: Abril 2024"
+                className="w-full h-14 rounded-lg border-slate-200 bg-slate-50 text-slate-900 focus:border-[#339cff] focus:ring-2 focus:ring-[#339cff]/20 px-4 transition-all"
+                required
+                value={newMonthName}
+                onChange={(e) => setNewMonthName(e.target.value)}
+                autoFocus
+              />
+            </div>
 
-          <button 
-            type="submit"
-            className="w-full bg-[#339cff] hover:bg-[#339cff]/90 text-white font-semibold py-4 rounded-lg shadow-lg shadow-[#339cff]/20 transition-all flex items-center justify-center gap-2 group"
-          >
-            <span>Iniciar Acesso</span>
-            <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
-          </button>
-        </form>
+            <div className="flex justify-between items-center">
+              <button 
+                type="button" 
+                onClick={() => setIsCreating(false)}
+                className="text-slate-500 hover:text-slate-700 text-sm font-medium transition-colors"
+              >
+                Cancelar
+              </button>
+              <button 
+                type="submit"
+                className="bg-[#339cff] hover:bg-[#339cff]/90 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition-all flex items-center gap-2"
+              >
+                <span>Criar e Iniciar</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+          </form>
+        )}
 
         <div className="mt-8 flex justify-center">
           <div className="w-full bg-slate-100 h-1 rounded-full overflow-hidden">

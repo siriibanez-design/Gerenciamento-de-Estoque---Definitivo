@@ -6,7 +6,7 @@ import autoTable from 'jspdf-autotable';
 import { useInventory } from '../context/InventoryContext';
 
 export default function Movements() {
-  const { items, movements, addMovement, updateMovement, deleteMovement } = useInventory();
+  const { items, movements, addMovement, updateMovement, deleteMovement, isCycleClosed } = useInventory();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -116,13 +116,15 @@ export default function Movements() {
           <h1 className="text-slate-900 text-3xl font-black leading-tight tracking-tight">Movimentações</h1>
           <p className="text-slate-500 text-sm">Gerencie o fluxo de entrada e saída de materiais do estoque municipal.</p>
         </div>
-        <button 
-          onClick={() => setIsModalOpen(true)}
-          className="flex min-w-[140px] cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-lg h-11 px-6 bg-[#359EFF] text-white text-sm font-bold shadow-lg shadow-[#359EFF]/20 hover:bg-[#359EFF]/90 transition-all"
-        >
-          <Plus className="w-5 h-5" />
-          <span>Nova Movimentação</span>
-        </button>
+        {!isCycleClosed && (
+          <button 
+            onClick={() => setIsModalOpen(true)}
+            className="flex min-w-[140px] cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-lg h-11 px-6 bg-[#359EFF] text-white text-sm font-bold shadow-lg shadow-[#359EFF]/20 hover:bg-[#359EFF]/90 transition-all"
+          >
+            <Plus className="w-5 h-5" />
+            <span>Nova Movimentação</span>
+          </button>
+        )}
       </div>
 
       <AnimatePresence>
@@ -318,7 +320,7 @@ export default function Movements() {
                 <th className="px-6 py-4 text-left text-slate-500 text-xs font-bold uppercase tracking-wider">Local / Pedido</th>
                 <th className="px-6 py-4 text-left text-slate-500 text-xs font-bold uppercase tracking-wider">Tipo</th>
                 <th className="px-6 py-4 text-right text-slate-500 text-xs font-bold uppercase tracking-wider">Quantidade</th>
-                <th className="px-6 py-4 text-center text-slate-500 text-xs font-bold uppercase tracking-wider">Ações</th>
+                {!isCycleClosed && <th className="px-6 py-4 text-center text-slate-500 text-xs font-bold uppercase tracking-wider">Ações</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 bg-white">
@@ -334,24 +336,26 @@ export default function Movements() {
                     </span>
                   </td>
                   <td className="px-6 py-5 text-right text-slate-900 text-sm font-bold">{m.qty}</td>
-                  <td className="px-6 py-5 text-center">
-                    <div className="flex items-center justify-center gap-2">
-                      <button 
-                        onClick={() => handleEdit(m)}
-                        className="p-1.5 text-slate-400 hover:text-[#359EFF] hover:bg-[#359EFF]/10 rounded-lg transition-all"
-                        title="Alterar"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button 
-                        onClick={() => confirmDelete(m.id)}
-                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
-                        title="Excluir"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
+                  {!isCycleClosed && (
+                    <td className="px-6 py-5 text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <button 
+                          onClick={() => handleEdit(m)}
+                          className="p-1.5 text-slate-400 hover:text-[#359EFF] hover:bg-[#359EFF]/10 rounded-lg transition-all"
+                          title="Alterar"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => confirmDelete(m.id)}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                          title="Excluir"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))}
               {filteredMovements.length === 0 && (

@@ -70,6 +70,14 @@ export interface Process {
   suppliers: Supplier[];
 }
 
+export interface Cycle {
+  id: string;
+  isClosed: boolean;
+  baseItems: InventoryItem[];
+  movements: Movement[];
+  uploadHistory: UploadHistory[];
+}
+
 interface InventoryContextType {
   items: InventoryItem[];
   categories: string[];
@@ -77,6 +85,10 @@ interface InventoryContextType {
   uploadHistory: UploadHistory[];
   orders: Order[];
   processes: Process[];
+  activeCycleId: string | null;
+  cycles: Cycle[];
+  isCycleClosed: boolean;
+  setActiveCycle: (id: string) => void;
   addItem: (item: Omit<InventoryItem, 'id' | 'in' | 'out' | 'deadline' | 'current' | 'totalOut'> & { current: number; unitPrice: number }) => void;
   updateItem: (id: number, item: Partial<InventoryItem>) => void;
   deleteItem: (id: number) => void;
@@ -92,6 +104,7 @@ interface InventoryContextType {
   updateOrderStatus: (id: string, status: Order['status']) => void;
   deleteOrder: (id: string) => void;
   updateProcesses: (processes: Process[]) => void;
+  turnCycle: () => void;
 }
 
 const initialItems: InventoryItem[] = [
@@ -99,8 +112,6 @@ const initialItems: InventoryItem[] = [
   { id: 2, code: '2020', item: 'Cesta Básica Tipo 01', category: 'Assistência Social', initialStock: 120, minStock: 500, target: 650, in: '0', out: '0', totalOut: 0, current: 120, deadline: '-', unitPrice: 185.00 },
 ];
 const initialCategories: string[] = ['Secretaria de Educação', 'Assistência Social', 'Infraestrutura', 'Saúde', 'Administrativo'];
-const initialMovements: Movement[] = [];
-const initialUploadHistory: UploadHistory[] = [];
 const initialOrders: Order[] = [
   { id: '01-03', date: '12/03/2026', value: 'R$ 1.250,00', status: 'ENTREGUE', statusColor: 'bg-emerald-100 text-emerald-700', items: [] },
   { id: '02-03', date: '13/03/2026', value: 'R$ 4.890,00', status: 'PENDENTE', statusColor: 'bg-amber-100 text-amber-700', items: [] },
@@ -110,33 +121,18 @@ const initialOrders: Order[] = [
 const InventoryContext = createContext<InventoryContextType | undefined>(undefined);
 
 export function InventoryProvider({ children }: { children: React.ReactNode }) {
-  const [baseItems, setBaseItems] = useState<InventoryItem[]>(() => {
-    const saved = localStorage.getItem('inventory_items');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      // Migration: ensure initialStock and code exist
-      return parsed.map((item: any) => ({
-        ...item,
-        code: item.code || '',
-        initialStock: item.initialStock !== undefined ? item.initialStock : (item.current || 0)
-      }));
-    }
-    return initialItems;
+  const [activeCycleId, setActiveCycleId] = useState<string | null>(() => {
+    return localStorage.getItem('inventory_active_cycle');
+  });
+
+  const [cycles, setCycles] = useState<Cycle[]>(() => {
+    const saved = localStorage.getItem('inventory_cycles');
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [categories, setCategories] = useState<string[]>(() => {
     const saved = localStorage.getItem('inventory_categories');
     return saved ? JSON.parse(saved) : initialCategories;
-  });
-
-  const [movements, setMovements] = useState<Movement[]>(() => {
-    const saved = localStorage.getItem('inventory_movements');
-    return saved ? JSON.parse(saved) : initialMovements;
-  });
-
-  const [uploadHistory, setUploadHistory] = useState<UploadHistory[]>(() => {
-    const saved = localStorage.getItem('inventory_upload_history');
-    return saved ? JSON.parse(saved) : initialUploadHistory;
   });
 
   const [orders, setOrders] = useState<Order[]>(() => {
@@ -149,21 +145,21 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
     return saved ? JSON.parse(saved) : [];
   });
 
+  // Helper to get current cycle data
+  const currentCycle = cycles.find(c => c.id === activeCycleId);
+  const isCycleClosed = currentCycle?.isClosed || false;
+
   useEffect(() => {
-    localStorage.setItem('inventory_items', JSON.stringify(baseItems));
-  }, [baseItems]);
+    localStorage.setItem('inventory_cycles', JSON.stringify(cycles));
+  }, [cycles]);
+
+  useEffect(() => {
+    localStorage.setItem('inventory_active_cycle', activeCycleId || '');
+  }, [activeCycleId]);
 
   useEffect(() => {
     localStorage.setItem('inventory_categories', JSON.stringify(categories));
   }, [categories]);
-
-  useEffect(() => {
-    localStorage.setItem('inventory_movements', JSON.stringify(movements));
-  }, [movements]);
-
-  useEffect(() => {
-    localStorage.setItem('inventory_upload_history', JSON.stringify(uploadHistory));
-  }, [uploadHistory]);
 
   useEffect(() => {
     localStorage.setItem('inventory_orders', JSON.stringify(orders));
@@ -173,16 +169,62 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('inventory_processes', JSON.stringify(processes));
   }, [processes]);
 
-  // Calculate items with totals
+  const setActiveCycle = (id: string) => {
+    setActiveCycleId(id);
+    setCycles(prev => {
+      if (prev.find(c => c.id === id)) return prev;
+      
+      // If cycle doesn't exist, create it
+      // Find the last cycle to carry over items
+      const lastCycle = prev.length > 0 ? prev[prev.length - 1] : null;
+      
+      let newBaseItems: InventoryItem[] = [];
+      if (lastCycle) {
+        // Calculate current stock of last cycle to use as initial stock
+        newBaseItems = lastCycle.baseItems.map(item => {
+          const itemMovements = lastCycle.movements.filter(m => m.item === item.item);
+          const totalIn = itemMovements.filter(m => m.type === 'ENTRADA').reduce((acc, m) => acc + m.qty, 0);
+          const totalOut = itemMovements.filter(m => m.type === 'SAÍDA').reduce((acc, m) => acc + m.qty, 0);
+          const current = item.initialStock + totalIn - totalOut;
+          return {
+            ...item,
+            initialStock: current,
+            in: '0',
+            out: '0',
+            totalOut: 0,
+            current: current
+          };
+        });
+      } else {
+        newBaseItems = initialItems;
+      }
+
+      const newCycle: Cycle = {
+        id,
+        isClosed: false,
+        baseItems: newBaseItems,
+        movements: [],
+        uploadHistory: []
+      };
+      return [...prev, newCycle];
+    });
+  };
+
+  const updateCurrentCycle = (updater: (cycle: Cycle) => Cycle) => {
+    if (!activeCycleId || isCycleClosed) return;
+    setCycles(prev => prev.map(c => c.id === activeCycleId ? updater(c) : c));
+  };
+
+  // Derived data for the active cycle
+  const baseItems = currentCycle?.baseItems || [];
+  const movements = currentCycle?.movements || [];
+  const uploadHistory = currentCycle?.uploadHistory || [];
+
   const items = React.useMemo(() => {
     return baseItems.map(item => {
       const itemMovements = movements.filter(m => m.item === item.item);
-      const totalIn = itemMovements
-        .filter(m => m.type === 'ENTRADA')
-        .reduce((acc, m) => acc + m.qty, 0);
-      const totalOut = itemMovements
-        .filter(m => m.type === 'SAÍDA')
-        .reduce((acc, m) => acc + m.qty, 0);
+      const totalIn = itemMovements.filter(m => m.type === 'ENTRADA').reduce((acc, m) => acc + m.qty, 0);
+      const totalOut = itemMovements.filter(m => m.type === 'SAÍDA').reduce((acc, m) => acc + m.qty, 0);
       
       return {
         ...item,
@@ -195,60 +237,58 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
   }, [baseItems, movements]);
 
   const addItem = (newItem: Omit<InventoryItem, 'id' | 'in' | 'out' | 'deadline' | 'current' | 'totalOut'> & { current: number; unitPrice: number }) => {
-    const item: InventoryItem = {
-      ...newItem,
-      id: Date.now(),
-      initialStock: newItem.current,
-      in: '0',
-      out: '0',
-      totalOut: 0,
-      current: newItem.current,
-      deadline: '-',
-      unitPrice: newItem.unitPrice || 0
-    };
-    setBaseItems(prev => [...prev, item]);
+    updateCurrentCycle(c => ({
+      ...c,
+      baseItems: [...c.baseItems, {
+        ...newItem,
+        id: Date.now(),
+        initialStock: newItem.current,
+        in: '0',
+        out: '0',
+        totalOut: 0,
+        current: newItem.current,
+        deadline: '-',
+        unitPrice: newItem.unitPrice || 0
+      }]
+    }));
   };
 
   const updateItem = (id: number, updatedFields: Partial<InventoryItem>) => {
-    setBaseItems(prev => {
-      const itemToUpdate = prev.find(i => i.id === id);
-      if (!itemToUpdate) return prev;
+    updateCurrentCycle(c => {
+      const itemToUpdate = c.baseItems.find(i => i.id === id);
+      if (!itemToUpdate) return c;
 
       const oldName = itemToUpdate.item;
       const newName = updatedFields.item || oldName;
 
-      // If name changed, update all movements associated with this item
+      let newMovements = c.movements;
       if (newName !== oldName) {
-        setMovements(prevMovements => prevMovements.map(m => 
-          m.item === oldName ? { ...m, item: newName } : m
-        ));
+        newMovements = c.movements.map(m => m.item === oldName ? { ...m, item: newName } : m);
       }
 
-      return prev.map(item => {
+      const newBaseItems = c.baseItems.map(item => {
         if (item.id === id) {
           const updated = { ...item, ...updatedFields };
-          // If current was updated manually in the form, adjust initialStock
-          // so that (initialStock + totalIn - totalOut) equals the new current
           if (updatedFields.current !== undefined) {
-            const itemMovements = movements.filter(m => m.item === oldName);
-            const totalIn = itemMovements
-              .filter(m => m.type === 'ENTRADA')
-              .reduce((acc, m) => acc + m.qty, 0);
-            const totalOut = itemMovements
-              .filter(m => m.type === 'SAÍDA')
-              .reduce((acc, m) => acc + m.qty, 0);
-              
+            const itemMovements = newMovements.filter(m => m.item === oldName);
+            const totalIn = itemMovements.filter(m => m.type === 'ENTRADA').reduce((acc, m) => acc + m.qty, 0);
+            const totalOut = itemMovements.filter(m => m.type === 'SAÍDA').reduce((acc, m) => acc + m.qty, 0);
             updated.initialStock = updatedFields.current - totalIn + totalOut;
           }
           return updated;
         }
         return item;
       });
+
+      return { ...c, baseItems: newBaseItems, movements: newMovements };
     });
   };
 
   const deleteItem = (id: number) => {
-    setBaseItems(prev => prev.filter(item => item.id !== id));
+    updateCurrentCycle(c => ({
+      ...c,
+      baseItems: c.baseItems.filter(item => item.id !== id)
+    }));
   };
 
   const addCategory = (category: string) => {
@@ -259,10 +299,10 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
 
   const updateCategory = (oldName: string, newName: string) => {
     setCategories(prev => prev.map(c => c === oldName ? newName : c));
-    // Update all items in this category
-    setBaseItems(prev => prev.map(item => 
-      item.category === oldName ? { ...item, category: newName } : item
-    ));
+    updateCurrentCycle(c => ({
+      ...c,
+      baseItems: c.baseItems.map(item => item.category === oldName ? { ...item, category: newName } : item)
+    }));
   };
 
   const deleteCategory = (category: string) => {
@@ -270,64 +310,57 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
   };
 
   const addMovement = (newMovement: Omit<Movement, 'id' | 'date' | 'typeColor'>) => {
-    const movement: Movement = {
-      ...newMovement,
-      id: Date.now(),
-      date: new Date().toLocaleDateString('pt-BR'),
-      typeColor: newMovement.type === 'ENTRADA' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
-    };
-    setMovements(prev => [movement, ...prev]);
+    updateCurrentCycle(c => ({
+      ...c,
+      movements: [{
+        ...newMovement,
+        id: Date.now(),
+        date: new Date().toLocaleDateString('pt-BR'),
+        typeColor: newMovement.type === 'ENTRADA' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
+      }, ...c.movements]
+    }));
   };
 
   const updateMovement = (id: number, updatedFields: Partial<Movement>) => {
-    setMovements(prev => prev.map(m => {
-      if (m.id === id) {
-        const updated = { ...m, ...updatedFields };
-        if (updatedFields.type) {
-          updated.typeColor = updated.type === 'ENTRADA' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700';
+    updateCurrentCycle(c => ({
+      ...c,
+      movements: c.movements.map(m => {
+        if (m.id === id) {
+          const updated = { ...m, ...updatedFields };
+          if (updatedFields.type) {
+            updated.typeColor = updated.type === 'ENTRADA' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700';
+          }
+          return updated;
         }
-        return updated;
-      }
-      return m;
+        return m;
+      })
     }));
   };
 
   const deleteMovement = (id: number) => {
-    setBaseItems(prev => prev.map(item => {
-      const m = movements.find(mov => mov.id === id);
-      if (m && m.item === item.item) {
-        // If we delete a movement, we don't need to manually update initialStock 
-        // because 'items' is a memoized calculation based on baseItems and movements
-      }
-      return item;
+    updateCurrentCycle(c => ({
+      ...c,
+      movements: c.movements.filter(m => m.id !== id)
     }));
-    setMovements(prev => prev.filter(m => m.id !== id));
   };
 
   const addUploadHistory = (fileName: string, uploadedItems: { code: string; item: string; qty: number }[]) => {
-    const uploadId = Date.now();
-    const newHistory: UploadHistory = {
-      id: uploadId,
-      date: new Date().toLocaleString('pt-BR'),
-      fileName
-    };
+    updateCurrentCycle(c => {
+      const uploadId = Date.now();
+      const newHistory: UploadHistory = {
+        id: uploadId,
+        date: new Date().toLocaleString('pt-BR'),
+        fileName
+      };
 
-    setUploadHistory(prev => [newHistory, ...prev]);
+      const groupedItems = uploadedItems.reduce((acc, current) => {
+        const itemName = current.item;
+        if (!acc[itemName]) acc[itemName] = { item: itemName, qty: 0 };
+        acc[itemName].qty += current.qty;
+        return acc;
+      }, {} as Record<string, { item: string; qty: number }>);
 
-    // Group and sum items by their system name (already converted in Upload.tsx)
-    const groupedItems = uploadedItems.reduce((acc, current) => {
-      const itemName = current.item;
-      
-      if (!acc[itemName]) {
-        acc[itemName] = { item: itemName, qty: 0 };
-      }
-      acc[itemName].qty += current.qty;
-      return acc;
-    }, {} as Record<string, { item: string; qty: number }>);
-
-    // Add movements for each grouped item
-    const newMovements: Movement[] = Object.values(groupedItems).map(group => {
-      return {
+      const newMovements: Movement[] = Object.values(groupedItems).map(group => ({
         id: Math.random() * 1000000 + Date.now(),
         date: new Date().toLocaleDateString('pt-BR'),
         item: group.item,
@@ -336,15 +369,22 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
         typeColor: 'bg-rose-100 text-rose-700',
         location: 'IMPORTAÇÃO',
         uploadId
+      }));
+
+      return {
+        ...c,
+        uploadHistory: [newHistory, ...c.uploadHistory],
+        movements: [...newMovements, ...c.movements]
       };
     });
-
-    setMovements(prev => [...newMovements, ...prev]);
   };
 
   const removeUploadHistory = (id: number) => {
-    setUploadHistory(prev => prev.filter(h => h.id !== id));
-    setMovements(prev => prev.filter(m => m.uploadId !== id));
+    updateCurrentCycle(c => ({
+      ...c,
+      uploadHistory: c.uploadHistory.filter(h => h.id !== id),
+      movements: c.movements.filter(m => m.uploadId !== id)
+    }));
   };
 
   const addOrder = (newOrder: Omit<Order, 'id' | 'date' | 'status' | 'statusColor'>) => {
@@ -382,6 +422,11 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
     setProcesses(newProcesses);
   };
 
+  const turnCycle = () => {
+    if (!activeCycleId) return;
+    setCycles(prev => prev.map(c => c.id === activeCycleId ? { ...c, isClosed: true } : c));
+  };
+
   return (
     <InventoryContext.Provider value={{ 
       items, 
@@ -390,6 +435,10 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       uploadHistory,
       orders,
       processes,
+      activeCycleId,
+      cycles,
+      isCycleClosed,
+      setActiveCycle,
       addItem, 
       updateItem, 
       deleteItem, 
@@ -404,7 +453,8 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       addOrder,
       updateOrderStatus,
       deleteOrder,
-      updateProcesses
+      updateProcesses,
+      turnCycle
     }}>
       {children}
     </InventoryContext.Provider>
