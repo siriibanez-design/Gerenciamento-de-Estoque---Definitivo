@@ -5,6 +5,21 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useInventory } from '../context/InventoryContext';
 
+import { cn } from '../lib/utils';
+
+const categoryColors = [
+  'bg-blue-50 text-blue-700 border-blue-100',
+  'bg-emerald-50 text-emerald-700 border-emerald-100',
+  'bg-amber-50 text-amber-700 border-amber-100',
+  'bg-rose-50 text-rose-700 border-rose-100',
+  'bg-indigo-50 text-indigo-700 border-indigo-100',
+  'bg-violet-50 text-violet-700 border-violet-100',
+  'bg-cyan-50 text-cyan-700 border-cyan-100',
+  'bg-teal-50 text-teal-700 border-teal-100',
+  'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-100',
+  'bg-orange-50 text-orange-700 border-orange-100',
+];
+
 export default function Reports() {
   const { items, categories, addItem, updateItem, deleteItem, addCategory, updateCategory, deleteCategory, isCycleClosed } = useInventory();
   const [selectedCategory, setSelectedCategory] = useState('TODOS');
@@ -154,7 +169,7 @@ export default function Reports() {
     });
 
     autoTable(doc, {
-      head: [['CÓDIGO', 'ITEM', 'CATEGORIA', 'ESTOQ. ATUAL', 'ESTOQ. MÍN.', 'ENTRADAS', 'SAÍDAS', 'TETO', 'FALTA TETO', 'ATUAL/MÍN']],
+      head: [['CÓDIGO', 'ITEM', 'CATEGORIA', 'ESTOQ. ATUAL', 'ESTOQ. MÍN.', 'ENTRADAS', 'SAÍDAS', 'TETO', 'FALTA TETO', 'EA/M']],
       body: tableData,
       startY: 40,
       theme: 'striped',
@@ -261,22 +276,34 @@ export default function Reports() {
       </AnimatePresence>
 
       {/* Categories Bar */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-2 custom-scrollbar">
+      <div className="flex items-center justify-start gap-3 overflow-x-auto pb-4 custom-scrollbar">
         <button 
           onClick={() => setSelectedCategory('TODOS')}
-          className={`px-4 py-2 rounded-full text-xs font-bold transition-all whitespace-nowrap ${selectedCategory === 'TODOS' ? 'bg-[#004a99] text-white shadow-md shadow-[#004a99]/20' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+          className={cn(
+            "px-6 py-2.5 rounded-full text-xs font-bold transition-all whitespace-nowrap border flex items-center justify-center min-w-[100px]",
+            selectedCategory === 'TODOS' 
+              ? "bg-[#004a99] text-white border-[#004a99] shadow-md shadow-[#004a99]/20" 
+              : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+          )}
         >
           TODOS
         </button>
-        {categories.map(cat => (
+        {categories.map((cat, index) => (
           <div key={cat} className="relative group flex-shrink-0">
             <button 
               onClick={() => setSelectedCategory(cat)}
-              className={`px-4 py-2 rounded-full text-xs font-bold transition-all whitespace-nowrap pr-14 ${selectedCategory === cat ? 'bg-[#004a99] text-white shadow-md shadow-[#004a99]/20' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+              className={cn(
+                "pl-4 pr-12 py-2.5 rounded-full text-xs font-bold transition-all whitespace-nowrap border flex items-center justify-start min-w-[140px]",
+                selectedCategory === cat 
+                  ? "bg-[#004a99] text-white border-[#004a99] shadow-md shadow-[#004a99]/20" 
+                  : `${categoryColors[index % categoryColors.length]} hover:brightness-95`
+              )}
             >
               {cat.toUpperCase()}
             </button>
-            <div className={`absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 transition-all opacity-0 group-hover:opacity-100`}>
+            <div className={cn(
+              "absolute right-3 top-1/2 -translate-y-1/2 flex gap-1 transition-all opacity-0 group-hover:opacity-100"
+            )}>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -284,7 +311,10 @@ export default function Reports() {
                   setNewCategory(cat);
                   setIsCategoryModalOpen(true);
                 }}
-                className={`p-0.5 rounded-full transition-all ${selectedCategory === cat ? 'text-white/70 hover:text-white hover:bg-white/20' : 'text-slate-400 hover:text-[#004a99] hover:bg-slate-100'}`}
+                className={cn(
+                  "p-1 rounded-full transition-all text-amber-500",
+                  selectedCategory === cat ? "hover:bg-white/20" : "hover:bg-black/5"
+                )}
               >
                 <Edit2 className="w-3 h-3" />
               </button>
@@ -294,7 +324,10 @@ export default function Reports() {
                   setCategoryToDelete(cat);
                   setIsDeleteCategoryModalOpen(true);
                 }}
-                className={`p-0.5 rounded-full transition-all ${selectedCategory === cat ? 'text-white/70 hover:text-white hover:bg-white/20' : 'text-slate-400 hover:text-rose-500 hover:bg-rose-50'}`}
+                className={cn(
+                  "p-1 rounded-full transition-all text-rose-600",
+                  selectedCategory === cat ? "hover:bg-white/20" : "hover:bg-rose-500/10"
+                )}
               >
                 <X className="w-3 h-3" />
               </button>
@@ -320,7 +353,7 @@ export default function Reports() {
                 <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-wider text-xs">Saídas</th>
                 <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-wider text-xs">Teto</th>
                 <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-wider text-center text-xs">Falta do Teto</th>
-                <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-wider text-right text-xs">Estoq. Atual / Mínimo</th>
+                <th className="px-2 py-4 font-bold text-slate-500 uppercase tracking-wider text-right text-xs">EA/M</th>
                 {!isCycleClosed && <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-wider text-center text-xs">Ações</th>}
               </tr>
             </thead>
@@ -359,7 +392,7 @@ export default function Reports() {
                         </div>
                       </div>
                     </td>
-                    <td className={`px-6 py-4 text-right font-bold text-[11px] ${status.color}`}>
+                    <td className={`px-2 py-4 text-right font-bold text-[11px] ${status.color}`}>
                       {r.minStock > 0 ? (r.current / r.minStock).toFixed(2) : '0.00'}
                     </td>
                     {!isCycleClosed && (
