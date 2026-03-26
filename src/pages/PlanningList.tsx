@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Filter, ShoppingCart, AlertTriangle, Hourglass, ShoppingBag, ChevronLeft, ChevronRight, ArrowLeft, Check, X } from 'lucide-react';
+import { Filter, ShoppingCart, AlertTriangle, Hourglass, ShoppingBag, ChevronLeft, ChevronRight, ArrowLeft, Check, X, Truck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { useInventory } from '../context/InventoryContext';
@@ -11,7 +11,10 @@ export default function PlanningList({ isSubPage = false }: { isSubPage?: boolea
   const { addOrder, items: inventoryItems, processes, orders } = useInventory();
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [itemValues, setItemValues] = useState<Record<string, string>>({});
+  const [selectedOffers, setSelectedOffers] = useState<Record<string, number>>({});
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+  const [isOfferModalOpen, setIsOfferModalOpen] = useState(false);
+  const [currentOfferItem, setCurrentOfferItem] = useState<any>(null);
   const [notification, setNotification] = useState<{ type: 'success' | 'error', message: string } | null>(null);
 
   // Auto-hide notification
@@ -34,25 +37,28 @@ export default function PlanningList({ isSubPage = false }: { isSubPage?: boolea
     const suggest = diff > 0 ? Math.ceil(diff * 1.3) : 0;
     const status = item.current <= item.minStock * 0.5 ? 'critical' : item.current <= item.minStock ? 'warning' : 'normal';
     
-    // Find unit price, process and item number in processes/suppliers
-    let supplierPrice = 0;
-    let processNumber = '';
-    let itemNumber = '';
+    // Find ALL matching offers in processes/suppliers
+    const offers: { unitPrice: number; process: string; itemNumber: string; supplierName: string }[] = [];
 
     for (const process of processes) {
       for (const supplier of process.suppliers) {
         const matchingItem = supplier.items.find(si => si.description === item.item);
         if (matchingItem) {
-          supplierPrice = matchingItem.value;
-          processNumber = process.number;
-          itemNumber = matchingItem.number;
-          break;
+          offers.push({
+            unitPrice: matchingItem.value,
+            process: process.number,
+            itemNumber: matchingItem.number,
+            supplierName: supplier.name
+          });
         }
       }
-      if (supplierPrice > 0) break;
     }
 
-    const unitPrice = supplierPrice > 0 ? supplierPrice : item.unitPrice;
+    // Sort offers by price (lowest first)
+    offers.sort((a, b) => a.unitPrice - b.unitPrice);
+
+    // Default to the best offer (cheapest)
+    const bestOffer = offers[0] || { unitPrice: item.unitPrice, process: '', itemNumber: '', supplierName: 'Preço Base' };
     
     return {
       id: String(item.id),
@@ -61,12 +67,18 @@ export default function PlanningList({ isSubPage = false }: { isSubPage?: boolea
       current: `${item.current} unidades`,
       min: `${item.minStock} unidades`,
       suggest: String(suggest),
-      unitPrice,
       status,
-      process: processNumber,
-      itemNumber: itemNumber
+      offers,
+      defaultOffer: bestOffer
     };
   }).filter(item => parseInt(item.suggest) > 0);
+
+  const getSelectedItemOffer = (itemId: string) => {
+    const item = planningItems.find(i => i.id === itemId);
+    if (!item) return null;
+    const offerIndex = selectedOffers[itemId] ?? 0;
+    return item.offers[offerIndex] || item.defaultOffer;
+  };
 
   const toggleItem = (id: string) => {
     setSelectedItems(prev => 
@@ -95,13 +107,13 @@ export default function PlanningList({ isSubPage = false }: { isSubPage?: boolea
       .filter(item => selectedItems.includes(item.id) && itemValues[item.id])
       .map(item => {
         const qty = parseFloat(itemValues[item.id].replace(',', '.'));
-        const unitPrice = item.unitPrice;
+        const offer = getSelectedItemOffer(item.id);
         return {
           name: item.name,
           qty: String(qty),
-          value: String(unitPrice),
-          process: item.process,
-          itemNumber: item.itemNumber
+          value: String(offer?.unitPrice || 0),
+          process: offer?.process || '',
+          itemNumber: offer?.itemNumber || ''
         };
       });
 
@@ -127,7 +139,8 @@ export default function PlanningList({ isSubPage = false }: { isSubPage?: boolea
   const estimatedTotal = planningItems.reduce((acc, item) => {
     if (!selectedItems.includes(item.id)) return acc;
     const qty = parseFloat((itemValues[item.id] || '0').replace(',', '.'));
-    const unitPrice = item.unitPrice || 0;
+    const offer = getSelectedItemOffer(item.id);
+    const unitPrice = offer?.unitPrice || 0;
     return acc + (isNaN(qty) ? 0 : qty * unitPrice);
   }, 0);
 
@@ -299,12 +312,35 @@ export default function PlanningList({ isSubPage = false }: { isSubPage?: boolea
                         {item.suggest}
                       </span>
                     </td>
-                    <td className="px-6 py-5 text-right font-bold text-slate-700">
-                      {unitPrice > 0 ? (
-                        new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(unitPrice)
-                      ) : (
-                        <span className="text-slate-300">-</span>
-                      )}
+                    <td className="px-6 py-5 text-right">
+                      <div className="flex flex-col items-end gap-1">
+                        <button 
+                          onClick={() => {
+                            if (item.offers.length > 1) {
+                              setCurrentOfferItem(item);
+                              setIsOfferModalOpen(true);
+                            }
+                          }}
+                          className={cn(
+                            "font-bold transition-colors",
+                            item.offers.length > 1 ? "text-[#359EFF] hover:text-[#359EFF]/80 underline decoration-dotted underline-offset-4" : "text-slate-700"
+                          )}
+                        >
+                          {getSelectedItemOffer(item.id)?.unitPrice ? (
+                            new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(getSelectedItemOffer(item.id)!.unitPrice)
+                          ) : (
+                            <span className="text-slate-300">-</span>
+                          )}
+                        </button>
+                        {item.offers.length > 1 && (
+                          <span className="text-[9px] font-black bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded uppercase tracking-tighter">
+                            {item.offers.length} Ofertas
+                          </span>
+                        )}
+                        <span className="text-[10px] text-slate-400 font-medium truncate max-w-[120px]">
+                          {getSelectedItemOffer(item.id)?.supplierName}
+                        </span>
+                      </div>
                     </td>
                     <td className="px-6 py-5 text-right">
                       <input 
@@ -362,6 +398,71 @@ export default function PlanningList({ isSubPage = false }: { isSubPage?: boolea
       </div>
 
       <AnimatePresence>
+        {isOfferModalOpen && currentOfferItem && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200"
+            >
+              <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <div>
+                  <h3 className="text-lg font-black text-slate-900 tracking-tight">Escolher Fornecedor</h3>
+                  <p className="text-slate-500 text-xs font-medium uppercase tracking-wider">{currentOfferItem.name}</p>
+                </div>
+                <button onClick={() => setIsOfferModalOpen(false)} className="p-2 hover:bg-slate-200 rounded-lg transition-colors text-slate-400">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-6 space-y-4">
+                <div className="space-y-2">
+                  {currentOfferItem.offers.map((offer: any, idx: number) => (
+                    <button
+                      key={idx}
+                      onClick={() => {
+                        setSelectedOffers(prev => ({ ...prev, [currentOfferItem.id]: idx }));
+                        setIsOfferModalOpen(false);
+                      }}
+                      className={cn(
+                        "w-full p-4 rounded-xl border text-left transition-all flex items-center justify-between group",
+                        (selectedOffers[currentOfferItem.id] ?? 0) === idx
+                          ? "bg-[#359EFF]/5 border-[#359EFF] shadow-sm"
+                          : "bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                      )}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className={cn(
+                          "w-10 h-10 rounded-full flex items-center justify-center transition-colors",
+                          (selectedOffers[currentOfferItem.id] ?? 0) === idx
+                            ? "bg-[#359EFF] text-white"
+                            : "bg-slate-100 text-slate-400 group-hover:bg-slate-200"
+                        )}>
+                          <Truck className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <p className="font-bold text-slate-900">{offer.supplierName}</p>
+                          <p className="text-xs text-slate-500">Processo: {offer.process} | Item: {offer.itemNumber}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-black text-slate-900">
+                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(offer.unitPrice)}
+                        </p>
+                        {idx === 0 && (
+                          <span className="text-[9px] font-black bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded uppercase tracking-tighter">
+                            Melhor Preço
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
         {isConfirmModalOpen && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
             <motion.div 
