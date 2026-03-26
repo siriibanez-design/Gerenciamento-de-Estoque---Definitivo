@@ -99,10 +99,6 @@ export default function Layout({ children }: LayoutProps) {
               <Bell className="w-5 h-5" />
             </button>
             <div className="flex items-center gap-3 border-l border-slate-200 pl-6">
-              <div className="flex flex-col items-end">
-                <span className="text-xs font-bold text-slate-900">João Silva</span>
-                <span className="text-[10px] text-slate-500 uppercase tracking-wider">Administrador</span>
-              </div>
               <div className="bg-[#359EFF]/10 flex items-center justify-center rounded-full w-10 h-10 border border-[#359EFF]/20">
                 <User className="w-5 h-5 text-[#359EFF]" />
               </div>

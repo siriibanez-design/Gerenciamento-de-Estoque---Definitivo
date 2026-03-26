@@ -89,6 +89,8 @@ interface InventoryContextType {
   cycles: Cycle[];
   isCycleClosed: boolean;
   setActiveCycle: (id: string) => void;
+  updateCycle: (oldId: string, newId: string) => void;
+  deleteCycle: (id: string) => void;
   addItem: (item: Omit<InventoryItem, 'id' | 'in' | 'out' | 'deadline' | 'current' | 'totalOut'> & { current: number; unitPrice: number }) => void;
   updateItem: (id: number, item: Partial<InventoryItem>) => void;
   deleteItem: (id: number) => void;
@@ -115,26 +117,26 @@ const InventoryContext = createContext<InventoryContextType | undefined>(undefin
 
 export function InventoryProvider({ children }: { children: React.ReactNode }) {
   const [activeCycleId, setActiveCycleId] = useState<string | null>(() => {
-    return localStorage.getItem('inventory_active_cycle_v3');
+    return localStorage.getItem('inventory_active_cycle_v4');
   });
 
   const [cycles, setCycles] = useState<Cycle[]>(() => {
-    const saved = localStorage.getItem('inventory_cycles_v3');
+    const saved = localStorage.getItem('inventory_cycles_v4');
     return saved ? JSON.parse(saved) : [];
   });
 
   const [categories, setCategories] = useState<string[]>(() => {
-    const saved = localStorage.getItem('inventory_categories_v3');
+    const saved = localStorage.getItem('inventory_categories_v4');
     return saved ? JSON.parse(saved) : initialCategories;
   });
 
   const [orders, setOrders] = useState<Order[]>(() => {
-    const saved = localStorage.getItem('inventory_orders_v3');
+    const saved = localStorage.getItem('inventory_orders_v4');
     return saved ? JSON.parse(saved) : initialOrders;
   });
 
   const [processes, setProcesses] = useState<Process[]>(() => {
-    const saved = localStorage.getItem('inventory_processes_v3');
+    const saved = localStorage.getItem('inventory_processes_v4');
     return saved ? JSON.parse(saved) : [];
   });
 
@@ -143,23 +145,23 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
   const isCycleClosed = currentCycle?.isClosed || false;
 
   useEffect(() => {
-    localStorage.setItem('inventory_cycles_v3', JSON.stringify(cycles));
+    localStorage.setItem('inventory_cycles_v4', JSON.stringify(cycles));
   }, [cycles]);
 
   useEffect(() => {
-    localStorage.setItem('inventory_active_cycle_v3', activeCycleId || '');
+    localStorage.setItem('inventory_active_cycle_v4', activeCycleId || '');
   }, [activeCycleId]);
 
   useEffect(() => {
-    localStorage.setItem('inventory_categories_v3', JSON.stringify(categories));
+    localStorage.setItem('inventory_categories_v4', JSON.stringify(categories));
   }, [categories]);
 
   useEffect(() => {
-    localStorage.setItem('inventory_orders_v3', JSON.stringify(orders));
+    localStorage.setItem('inventory_orders_v4', JSON.stringify(orders));
   }, [orders]);
 
   useEffect(() => {
-    localStorage.setItem('inventory_processes_v3', JSON.stringify(processes));
+    localStorage.setItem('inventory_processes_v4', JSON.stringify(processes));
   }, [processes]);
 
   const setActiveCycle = (id: string) => {
@@ -201,6 +203,20 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       };
       return [...prev, newCycle];
     });
+  };
+
+  const updateCycle = (oldId: string, newId: string) => {
+    setCycles(prev => prev.map(c => c.id === oldId ? { ...c, id: newId } : c));
+    if (activeCycleId === oldId) {
+      setActiveCycleId(newId);
+    }
+  };
+
+  const deleteCycle = (id: string) => {
+    setCycles(prev => prev.filter(c => c.id !== id));
+    if (activeCycleId === id) {
+      setActiveCycleId(null);
+    }
   };
 
   const updateCurrentCycle = (updater: (cycle: Cycle) => Cycle) => {
@@ -432,6 +448,8 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       cycles,
       isCycleClosed,
       setActiveCycle,
+      updateCycle,
+      deleteCycle,
       addItem, 
       updateItem, 
       deleteItem, 

@@ -106,19 +106,10 @@ export default function ManagementDashboard() {
           <h1 className="text-3xl font-black text-slate-900 tracking-tight">Dashboard Gerencial</h1>
           <p className="text-slate-500 font-medium">Monitoramento Estratégico e Previsões</p>
         </div>
-        <div className="flex items-center gap-6 bg-white p-2 pr-4 rounded-2xl border border-slate-200 shadow-sm">
-          <div className="flex flex-col items-end border-r border-slate-100 pr-4">
+        <div className="flex items-center gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+          <div className="flex flex-col items-end">
             <span className="text-sm font-bold text-slate-900">{formattedDate} {formattedTime}</span>
-            <span className="text-[10px] text-slate-400 uppercase font-bold tracking-widest">Status do Sistema: OK</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="flex flex-col items-end">
-              <span className="text-sm font-bold text-slate-900">Maria Silva</span>
-              <span className="text-[10px] text-[#359EFF] font-black uppercase tracking-wider">Diretora de Logística</span>
-            </div>
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#359EFF] to-[#1e40af] flex items-center justify-center text-white font-bold shadow-lg shadow-[#359EFF]/20">
-              MS
-            </div>
+            <span className="text-[10px] text-slate-400 uppercase font-bold tracking-widest text-right">Status do Sistema: OK</span>
           </div>
         </div>
       </header>
