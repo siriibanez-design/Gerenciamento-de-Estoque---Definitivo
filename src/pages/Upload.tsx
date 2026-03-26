@@ -50,7 +50,9 @@ export default function Upload() {
 
         // Preview with conversion
         const processedItems = rawItems.map(raw => {
-          const systemItem = items.find(i => i.code === raw.code);
+          const systemItem = items.find(i => 
+            i.code && i.code.split(',').map(c => c.trim()).includes(raw.code)
+          );
           return {
             ...raw,
             item: systemItem ? systemItem.item : 'Não encontrado',

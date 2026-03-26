@@ -12,30 +12,28 @@ export default function Conversion() {
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const [formData, setFormData] = useState({
-    item: '',
-    code: '',
-    category: categories[0] || ''
+    itemId: '',
+    code: ''
   });
 
   const filteredItems = items.filter(item => 
-    item.item.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (item.code && item.code.toLowerCase().includes(searchTerm.toLowerCase()))
+    (item.item.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (item.code && item.code.toLowerCase().includes(searchTerm.toLowerCase()))) &&
+    item.code // Only show items that have a code assigned
   );
 
   const handleOpenModal = (item?: any) => {
     if (item) {
       setEditingId(item.id);
       setFormData({
-        item: item.item,
-        code: item.code || '',
-        category: item.category
+        itemId: item.id.toString(),
+        code: item.code || ''
       });
     } else {
       setEditingId(null);
       setFormData({
-        item: '',
-        code: '',
-        category: categories[0] || ''
+        itemId: '',
+        code: ''
       });
     }
     setIsModalOpen(true);
@@ -43,21 +41,19 @@ export default function Conversion() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const selectedItem = items.find(i => i.id.toString() === formData.itemId);
+    if (!selectedItem) return;
+
     if (editingId !== null) {
       updateItem(editingId, {
-        item: formData.item,
-        code: formData.code,
-        category: formData.category
+        code: formData.code
       });
     } else {
-      addItem({
-        item: formData.item,
-        code: formData.code,
-        category: formData.category,
-        current: 0,
-        minStock: 0,
-        target: 0,
-        unitPrice: 0
+      // If adding a new code to an item that already has codes, we can append it
+      // But usually the user might just want to edit the existing list of codes
+      // For simplicity, let's just update the selected item's code field
+      updateItem(selectedItem.id, {
+        code: formData.code
       });
     }
     setIsModalOpen(false);
@@ -70,7 +66,8 @@ export default function Conversion() {
 
   const handleDelete = () => {
     if (deletingId !== null) {
-      deleteItem(deletingId);
+      // Instead of deleting the item, we just clear its code
+      updateItem(deletingId, { code: '' });
       setIsDeleteModalOpen(false);
       setDeletingId(null);
     }
@@ -202,35 +199,32 @@ export default function Conversion() {
               <form onSubmit={handleSubmit} className="p-6 space-y-4">
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Nome do Item</label>
-                  <input 
+                  <select 
                     required
-                    value={formData.item}
-                    onChange={(e) => setFormData({...formData, item: e.target.value})}
-                    placeholder="Ex: Galão de Água"
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-[#004a99] outline-none transition-all text-sm font-medium"
-                    type="text" 
-                  />
+                    value={formData.itemId}
+                    onChange={(e) => setFormData({...formData, itemId: e.target.value})}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-[#004a99] outline-none transition-all text-sm font-medium bg-white"
+                    disabled={editingId !== null}
+                  >
+                    <option value="">Selecione um item...</option>
+                    {items.map(item => (
+                      <option key={item.id} value={item.id}>{item.item} ({item.category})</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Código de Conversão</label>
-                  <input 
-                    required
-                    value={formData.code}
-                    onChange={(e) => setFormData({...formData, code: e.target.value})}
-                    placeholder="Ex: 18189893"
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-[#004a99] outline-none transition-all text-sm font-medium font-mono"
-                    type="text" 
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Categoria</label>
-                  <select 
-                    value={formData.category}
-                    onChange={(e) => setFormData({...formData, category: e.target.value})}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-[#004a99] outline-none transition-all text-sm font-medium bg-white"
-                  >
-                    {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                  </select>
+                  <div className="space-y-1">
+                    <input 
+                      required
+                      value={formData.code}
+                      onChange={(e) => setFormData({...formData, code: e.target.value})}
+                      placeholder="Ex: 18189893 ou 123, 456"
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-[#004a99] outline-none transition-all text-sm font-medium font-mono"
+                      type="text" 
+                    />
+                    <p className="text-[10px] text-slate-400">Para múltiplos códigos, separe por vírgula.</p>
+                  </div>
                 </div>
                 <button type="submit" className="w-full py-3 rounded-xl bg-[#004a99] text-white font-bold text-sm shadow-lg shadow-[#004a99]/20 hover:bg-[#004a99]/90 transition-all">
                   {editingId !== null ? 'Salvar Alterações' : 'Cadastrar Conversão'}

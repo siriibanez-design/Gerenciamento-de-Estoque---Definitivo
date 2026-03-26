@@ -41,7 +41,6 @@ export default function Reports() {
   const [newItem, setNewItem] = useState({
     item: '',
     category: '',
-    code: '',
     current: '',
     minStock: '',
     target: ''
@@ -80,7 +79,6 @@ export default function Reports() {
       updateItem(editingId, {
         item: newItem.item,
         category: itemCategory,
-        code: newItem.code,
         current: parseInt(newItem.current),
         minStock: parseInt(newItem.minStock),
         target: parseInt(newItem.target)
@@ -90,7 +88,7 @@ export default function Reports() {
       addItem({
         item: newItem.item,
         category: itemCategory,
-        code: newItem.code,
+        code: '',
         current: parseInt(newItem.current),
         minStock: parseInt(newItem.minStock),
         target: parseInt(newItem.target),
@@ -99,14 +97,13 @@ export default function Reports() {
     }
     
     setIsItemModalOpen(false);
-    setNewItem({ item: '', category: categories.find(c => c !== 'TODOS') || categories[0], code: '', current: '', minStock: '', target: '' });
+    setNewItem({ item: '', category: categories.find(c => c !== 'TODOS') || categories[0], current: '', minStock: '', target: '' });
   };
 
   const handleEdit = (item: any) => {
     setNewItem({
       item: item.item,
       category: item.category,
-      code: item.code || '',
       current: item.current.toString(),
       minStock: item.minStock.toString(),
       target: item.target.toString()
@@ -155,7 +152,6 @@ export default function Reports() {
       const ratio = r.minStock > 0 ? (r.current / r.minStock).toFixed(2) : '0.00';
 
       return [
-        r.code || '-',
         r.item,
         r.category,
         r.current.toString(),
@@ -169,20 +165,20 @@ export default function Reports() {
     });
 
     autoTable(doc, {
-      head: [['CÓDIGO', 'ITEM', 'CATEGORIA', 'ESTOQ. ATUAL', 'ESTOQ. MÍN.', 'ENTRADAS', 'SAÍDAS', 'TETO', 'FALTA TETO', 'EA/M']],
+      head: [['ITEM', 'CATEGORIA', 'ESTOQ. ATUAL', 'ESTOQ. MÍN.', 'ENTRADAS', 'SAÍDAS', 'TETO', 'FALTA TETO', 'EA/M']],
       body: tableData,
       startY: 40,
       theme: 'striped',
       headStyles: { fillColor: [0, 74, 153], fontSize: 8 },
       styles: { fontSize: 8 },
       columnStyles: {
+        2: { halign: 'center' },
         3: { halign: 'center' },
         4: { halign: 'center' },
         5: { halign: 'center' },
         6: { halign: 'center' },
         7: { halign: 'center' },
-        8: { halign: 'center' },
-        9: { halign: 'right' }
+        8: { halign: 'right' }
       }
     });
 
@@ -220,7 +216,7 @@ export default function Reports() {
             <button 
               onClick={() => {
                 setEditingId(null);
-                setNewItem({ item: '', category: categories[0], code: '', current: '', minStock: '', target: '' });
+                setNewItem({ item: '', category: categories[0], current: '', minStock: '', target: '' });
                 setIsItemModalOpen(true);
               }}
               className="px-4 py-2 bg-[#004a99] text-white font-bold text-xs rounded-lg hover:bg-[#004a99]/90 transition-colors flex items-center gap-2 shadow-sm shadow-[#004a99]/20"
@@ -345,7 +341,6 @@ export default function Reports() {
           <table className="w-full text-left border-collapse min-w-[1100px]">
             <thead className="bg-slate-50 sticky top-0 z-10">
               <tr className="border-b border-slate-200">
-                <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-wider text-xs">Código</th>
                 <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-wider text-xs">Item</th>
                 <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-wider text-xs">Estoque Atual</th>
                 <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-wider text-xs">Estoque Mínimo</th>
@@ -365,9 +360,6 @@ export default function Reports() {
                 
                 return (
                   <tr key={r.id} className="hover:bg-slate-50 transition-colors group">
-                    <td className="px-6 py-4">
-                      <span className="text-xs font-bold text-slate-400 font-mono">{r.code || '-'}</span>
-                    </td>
                     <td className="px-6 py-4">
                       <div className="flex flex-col">
                         <span className="font-bold text-slate-900 text-sm">{r.item}</span>
@@ -481,17 +473,7 @@ export default function Reports() {
               </div>
               <form onSubmit={handleSaveItem} className="p-6 space-y-4">
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Código</label>
-                    <input 
-                      value={newItem.code}
-                      onChange={(e) => setNewItem({...newItem, code: e.target.value})}
-                      placeholder="Ex: 18189893"
-                      className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-[#004a99] outline-none transition-all text-sm font-medium"
-                      type="text" 
-                    />
-                  </div>
-                  <div className="space-y-2">
+                  <div className="space-y-2 col-span-2">
                     <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Categoria</label>
                     <select 
                       value={newItem.category}
