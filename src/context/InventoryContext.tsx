@@ -107,41 +107,34 @@ interface InventoryContextType {
   turnCycle: () => void;
 }
 
-const initialItems: InventoryItem[] = [
-  { id: 1, code: '1010', item: 'Papel A4 Chambril 75g', category: 'Secretaria de Educação', initialStock: 450, minStock: 1000, target: 1300, in: '0', out: '0', totalOut: 0, current: 450, deadline: '-', unitPrice: 24.50 },
-  { id: 2, code: '2020', item: 'Cesta Básica Tipo 01', category: 'Assistência Social', initialStock: 120, minStock: 500, target: 650, in: '0', out: '0', totalOut: 0, current: 120, deadline: '-', unitPrice: 185.00 },
-];
-const initialCategories: string[] = ['Secretaria de Educação', 'Assistência Social', 'Infraestrutura', 'Saúde', 'Administrativo'];
-const initialOrders: Order[] = [
-  { id: '01-03', date: '12/03/2026', value: 'R$ 1.250,00', status: 'ENTREGUE', statusColor: 'bg-emerald-100 text-emerald-700', items: [] },
-  { id: '02-03', date: '13/03/2026', value: 'R$ 4.890,00', status: 'PENDENTE', statusColor: 'bg-amber-100 text-amber-700', items: [] },
-  { id: '03-03', date: '14/03/2026', value: 'R$ 850,00', status: 'CANCELADA', statusColor: 'bg-rose-100 text-rose-700', items: [] },
-];
+const initialItems: InventoryItem[] = [];
+const initialCategories: string[] = [];
+const initialOrders: Order[] = [];
 
 const InventoryContext = createContext<InventoryContextType | undefined>(undefined);
 
 export function InventoryProvider({ children }: { children: React.ReactNode }) {
   const [activeCycleId, setActiveCycleId] = useState<string | null>(() => {
-    return localStorage.getItem('inventory_active_cycle');
+    return localStorage.getItem('inventory_active_cycle_v3');
   });
 
   const [cycles, setCycles] = useState<Cycle[]>(() => {
-    const saved = localStorage.getItem('inventory_cycles');
+    const saved = localStorage.getItem('inventory_cycles_v3');
     return saved ? JSON.parse(saved) : [];
   });
 
   const [categories, setCategories] = useState<string[]>(() => {
-    const saved = localStorage.getItem('inventory_categories');
+    const saved = localStorage.getItem('inventory_categories_v3');
     return saved ? JSON.parse(saved) : initialCategories;
   });
 
   const [orders, setOrders] = useState<Order[]>(() => {
-    const saved = localStorage.getItem('inventory_orders');
+    const saved = localStorage.getItem('inventory_orders_v3');
     return saved ? JSON.parse(saved) : initialOrders;
   });
 
   const [processes, setProcesses] = useState<Process[]>(() => {
-    const saved = localStorage.getItem('inventory_processes');
+    const saved = localStorage.getItem('inventory_processes_v3');
     return saved ? JSON.parse(saved) : [];
   });
 
@@ -150,23 +143,23 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
   const isCycleClosed = currentCycle?.isClosed || false;
 
   useEffect(() => {
-    localStorage.setItem('inventory_cycles', JSON.stringify(cycles));
+    localStorage.setItem('inventory_cycles_v3', JSON.stringify(cycles));
   }, [cycles]);
 
   useEffect(() => {
-    localStorage.setItem('inventory_active_cycle', activeCycleId || '');
+    localStorage.setItem('inventory_active_cycle_v3', activeCycleId || '');
   }, [activeCycleId]);
 
   useEffect(() => {
-    localStorage.setItem('inventory_categories', JSON.stringify(categories));
+    localStorage.setItem('inventory_categories_v3', JSON.stringify(categories));
   }, [categories]);
 
   useEffect(() => {
-    localStorage.setItem('inventory_orders', JSON.stringify(orders));
+    localStorage.setItem('inventory_orders_v3', JSON.stringify(orders));
   }, [orders]);
 
   useEffect(() => {
-    localStorage.setItem('inventory_processes', JSON.stringify(processes));
+    localStorage.setItem('inventory_processes_v3', JSON.stringify(processes));
   }, [processes]);
 
   const setActiveCycle = (id: string) => {

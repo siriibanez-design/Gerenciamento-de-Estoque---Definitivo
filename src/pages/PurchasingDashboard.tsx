@@ -3,27 +3,40 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { TrendingUp, ShoppingCart, DollarSign, Users, FileText, ArrowLeft } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
+import { useInventory } from '../context/InventoryContext';
 
 import { cn } from '../lib/utils';
 
-const data = [
-  { name: 'JAN', value: 45000 },
-  { name: 'FEV', value: 52000 },
-  { name: 'MAR', value: 48000 },
-  { name: 'ABR', value: 61000 },
-  { name: 'MAI', value: 55000 },
-  { name: 'JUN', value: 67000 },
-];
-
-const categoryData = [
-  { name: 'Escritório', value: 12500 },
-  { name: 'Saúde', value: 28400 },
-  { name: 'Alimentação', value: 15600 },
-  { name: 'Limpeza', value: 8900 },
-];
-
 export default function PurchasingDashboard({ isSubPage = false }: { isSubPage?: boolean }) {
   const navigate = useNavigate();
+  const { orders, processes } = useInventory();
+
+  // 1. Gasto Total (Mês) - Sum of all orders (excluding CANCELADA)
+  const totalSpent = orders
+    .filter(o => o.status !== 'CANCELADA')
+    .reduce((acc, o) => {
+      const val = parseFloat(o.value.replace('R$', '').replace(/\./g, '').replace(',', '.').trim());
+      return acc + (isNaN(val) ? 0 : val);
+    }, 0);
+
+  // 2. Pedidos Emitidos
+  const ordersCount = orders.length;
+  const pendingOrdersCount = orders.filter(o => o.status === 'PENDENTE').length;
+
+  // 3. Nº de Fornecedores (Unique suppliers across all processes)
+  const uniqueSuppliers = new Set();
+  processes.forEach(p => {
+    p.suppliers.forEach(s => uniqueSuppliers.add(s.id));
+  });
+  const suppliersCount = uniqueSuppliers.size;
+
+  // 4. Nº de Processos
+  const processesCount = processes.length;
+  const activeProcessesCount = processes.length; // For now same as total
+
+  // Charts Data (Mocked for now as we don't have historical data structure yet, but keeping it empty as requested before)
+  const data: any[] = [];
+  const categoryData: any[] = [];
 
   return (
     <div className={cn("mx-auto max-w-7xl space-y-8", !isSubPage && "p-4 md:p-10")}>
@@ -50,9 +63,11 @@ export default function PurchasingDashboard({ isSubPage = false }: { isSubPage?:
             </div>
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Gasto Total (Mês)</p>
           </div>
-          <p className="text-2xl font-black text-slate-900">R$ 67.420</p>
-          <p className="text-xs text-emerald-600 font-bold mt-1 flex items-center gap-1">
-            <TrendingUp className="w-3 h-3" /> +12.5% vs mês anterior
+          <p className="text-2xl font-black text-slate-900">
+            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalSpent)}
+          </p>
+          <p className="text-xs text-slate-400 font-medium mt-1 flex items-center gap-1">
+            Baseado em ordens emitidas
           </p>
         </div>
         <div className="bg-white border border-slate-200 p-5 rounded-xl shadow-sm">
@@ -62,8 +77,10 @@ export default function PurchasingDashboard({ isSubPage = false }: { isSubPage?:
             </div>
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Pedidos Emitidos</p>
           </div>
-          <p className="text-2xl font-black text-slate-900">42</p>
-          <p className="text-xs text-slate-400 font-medium mt-1">8 pendentes de aprovação</p>
+          <p className="text-2xl font-black text-slate-900">{ordersCount}</p>
+          <p className="text-xs text-slate-400 font-medium mt-1">
+            {pendingOrdersCount} pendentes de aprovação
+          </p>
         </div>
         <div className="bg-white border border-slate-200 p-5 rounded-xl shadow-sm">
           <div className="flex items-center gap-3 mb-2">
@@ -72,8 +89,8 @@ export default function PurchasingDashboard({ isSubPage = false }: { isSubPage?:
             </div>
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Nº de Fornecedores</p>
           </div>
-          <p className="text-2xl font-black text-slate-900">156</p>
-          <p className="text-xs text-emerald-600 font-bold mt-1">12 novos este mês</p>
+          <p className="text-2xl font-black text-slate-900">{suppliersCount}</p>
+          <p className="text-xs text-slate-400 font-medium mt-1">Cadastrados nos processos</p>
         </div>
         <div className="bg-white border border-slate-200 p-5 rounded-xl shadow-sm">
           <div className="flex items-center gap-3 mb-2">
@@ -82,8 +99,8 @@ export default function PurchasingDashboard({ isSubPage = false }: { isSubPage?:
             </div>
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Nº de Processos</p>
           </div>
-          <p className="text-2xl font-black text-slate-900">84</p>
-          <p className="text-xs text-purple-600 font-bold mt-1">Em andamento</p>
+          <p className="text-2xl font-black text-slate-900">{processesCount}</p>
+          <p className="text-xs text-slate-400 font-medium mt-1">Processos em andamento</p>
         </div>
       </div>
 
