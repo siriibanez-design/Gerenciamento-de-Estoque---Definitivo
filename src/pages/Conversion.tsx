@@ -8,29 +8,35 @@ export default function Conversion() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [editingData, setEditingData] = useState<{ id: number; code: string } | null>(null);
+  const [deletingData, setDeletingData] = useState<{ id: number; code: string } | null>(null);
 
   const [formData, setFormData] = useState({
     itemId: '',
     code: ''
   });
 
-  const filteredItems = items.filter(item => 
-    (item.item.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (item.code && item.code.toLowerCase().includes(searchTerm.toLowerCase()))) &&
-    item.code // Only show items that have a code assigned
+  const conversionEntries = items.flatMap(item => {
+    if (!item.code) return [];
+    const codes = item.code.split(',').map(c => c.trim()).filter(c => c);
+    return codes.map(code => ({
+      ...item,
+      displayCode: code
+    }));
+  }).filter(entry => 
+    entry.item.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    entry.displayCode.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleOpenModal = (item?: any) => {
-    if (item) {
-      setEditingId(item.id);
+  const handleOpenModal = (entry?: any) => {
+    if (entry) {
+      setEditingData({ id: entry.id, code: entry.displayCode });
       setFormData({
-        itemId: item.id.toString(),
-        code: item.code || ''
+        itemId: entry.id.toString(),
+        code: entry.displayCode
       });
     } else {
-      setEditingId(null);
+      setEditingData(null);
       setFormData({
         itemId: '',
         code: ''
@@ -44,32 +50,44 @@ export default function Conversion() {
     const selectedItem = items.find(i => i.id.toString() === formData.itemId);
     if (!selectedItem) return;
 
-    if (editingId !== null) {
-      updateItem(editingId, {
-        code: formData.code
+    const currentCodes = selectedItem.code ? selectedItem.code.split(',').map(c => c.trim()).filter(c => c) : [];
+
+    if (editingData !== null) {
+      // Replace specific code
+      const newCodes = currentCodes.map(c => c === editingData.code ? formData.code.trim() : c);
+      // Remove duplicates if any
+      const uniqueCodes = Array.from(new Set(newCodes));
+      updateItem(selectedItem.id, {
+        code: uniqueCodes.join(', ')
       });
     } else {
-      // If adding a new code to an item that already has codes, we can append it
-      // But usually the user might just want to edit the existing list of codes
-      // For simplicity, let's just update the selected item's code field
-      updateItem(selectedItem.id, {
-        code: formData.code
-      });
+      // Add new code to existing ones
+      const newCode = formData.code.trim();
+      if (!currentCodes.includes(newCode)) {
+        const updatedCodes = [...currentCodes, newCode];
+        updateItem(selectedItem.id, {
+          code: updatedCodes.join(', ')
+        });
+      }
     }
     setIsModalOpen(false);
   };
 
-  const confirmDelete = (id: number) => {
-    setDeletingId(id);
+  const confirmDelete = (entry: any) => {
+    setDeletingData({ id: entry.id, code: entry.displayCode });
     setIsDeleteModalOpen(true);
   };
 
   const handleDelete = () => {
-    if (deletingId !== null) {
-      // Instead of deleting the item, we just clear its code
-      updateItem(deletingId, { code: '' });
+    if (deletingData !== null) {
+      const item = items.find(i => i.id === deletingData.id);
+      if (item && item.code) {
+        const currentCodes = item.code.split(',').map(c => c.trim()).filter(c => c);
+        const updatedCodes = currentCodes.filter(c => c !== deletingData.code);
+        updateItem(item.id, { code: updatedCodes.join(', ') });
+      }
       setIsDeleteModalOpen(false);
-      setDeletingId(null);
+      setDeletingData(null);
     }
   };
 
@@ -111,38 +129,38 @@ export default function Conversion() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {filteredItems.map((item) => (
-              <tr key={item.id} className="hover:bg-slate-50 transition-colors">
+            {conversionEntries.map((entry, idx) => (
+              <tr key={`${entry.id}-${idx}`} className="hover:bg-slate-50 transition-colors">
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500">
                       <Package className="w-4 h-4" />
                     </div>
                     <div>
-                      <div className="font-bold text-slate-900 text-sm">{item.item}</div>
-                      <div className="text-slate-400 text-[11px] font-medium uppercase">{item.category}</div>
+                      <div className="font-bold text-slate-900 text-sm">{entry.item}</div>
+                      <div className="text-slate-400 text-[11px] font-medium uppercase">{entry.category}</div>
                     </div>
                   </div>
                 </td>
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-2">
                     <Hash className="w-4 h-4 text-slate-300" />
-                    <span className={`font-mono text-sm ${item.code ? 'text-slate-700 font-bold' : 'text-slate-300 italic'}`}>
-                      {item.code || 'Nenhum código'}
+                    <span className="font-mono text-sm text-slate-700 font-bold">
+                      {entry.displayCode}
                     </span>
                   </div>
                 </td>
                 <td className="px-6 py-4">
                   <div className="flex items-center justify-center gap-3">
                     <button 
-                      onClick={() => handleOpenModal(item)}
+                      onClick={() => handleOpenModal(entry)}
                       className="p-2 text-slate-400 hover:text-[#004a99] hover:bg-[#004a99]/10 rounded-lg transition-all"
                       title="Alterar"
                     >
                       <Edit2 className="w-4 h-4" />
                     </button>
                     <button 
-                      onClick={() => confirmDelete(item.id)}
+                      onClick={() => confirmDelete(entry)}
                       className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
                       title="Excluir"
                     >
@@ -152,7 +170,7 @@ export default function Conversion() {
                 </td>
               </tr>
             ))}
-            {filteredItems.length === 0 && (
+            {conversionEntries.length === 0 && (
               <tr>
                 <td colSpan={3} className="px-6 py-12 text-center text-slate-400 italic">
                   Nenhum item encontrado para "{searchTerm}"
@@ -190,7 +208,7 @@ export default function Conversion() {
             >
               <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                 <h3 className="text-lg font-black text-slate-900 tracking-tight">
-                  {editingId !== null ? 'Alterar Conversão' : 'Nova Conversão'}
+                  {editingData !== null ? 'Alterar Conversão' : 'Nova Conversão'}
                 </h3>
                 <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-slate-200 rounded-lg transition-colors text-slate-400">
                   <X className="w-5 h-5" />
@@ -204,7 +222,7 @@ export default function Conversion() {
                     value={formData.itemId}
                     onChange={(e) => setFormData({...formData, itemId: e.target.value})}
                     className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-[#004a99] outline-none transition-all text-sm font-medium bg-white"
-                    disabled={editingId !== null}
+                    disabled={editingData !== null}
                   >
                     <option value="">Selecione um item...</option>
                     {items.map(item => (
@@ -227,7 +245,7 @@ export default function Conversion() {
                   </div>
                 </div>
                 <button type="submit" className="w-full py-3 rounded-xl bg-[#004a99] text-white font-bold text-sm shadow-lg shadow-[#004a99]/20 hover:bg-[#004a99]/90 transition-all">
-                  {editingId !== null ? 'Salvar Alterações' : 'Cadastrar Conversão'}
+                  {editingData !== null ? 'Salvar Alterações' : 'Cadastrar Conversão'}
                 </button>
               </form>
             </motion.div>
@@ -248,7 +266,7 @@ export default function Conversion() {
                 <div className="space-y-2">
                   <h3 className="text-xl font-black text-slate-900 tracking-tight">Confirmar Exclusão</h3>
                   <p className="text-slate-500 text-sm">
-                    Tem certeza que deseja excluir este item? Esta ação removerá o item e seu vínculo de código.
+                    Tem certeza que deseja excluir este código? Esta ação removerá apenas o vínculo deste código específico.
                   </p>
                 </div>
                 <div className="flex gap-3 pt-4">
