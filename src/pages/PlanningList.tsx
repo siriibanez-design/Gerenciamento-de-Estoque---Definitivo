@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Filter, ShoppingCart, AlertTriangle, Hourglass, ShoppingBag, ChevronLeft, ChevronRight, ArrowLeft, Check, X, Truck } from 'lucide-react';
+import { Filter, ShoppingCart, AlertTriangle, Hourglass, ShoppingBag, ChevronLeft, ChevronRight, ArrowLeft, Check, X, Truck, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { useInventory } from '../context/InventoryContext';
@@ -14,6 +14,8 @@ export default function PlanningList({ isSubPage = false }: { isSubPage?: boolea
   const [selectedOffers, setSelectedOffers] = useState<Record<string, number>>({});
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [isOfferModalOpen, setIsOfferModalOpen] = useState(false);
+  const [isManualModalOpen, setIsManualModalOpen] = useState(false);
+  const [manualItemIds, setManualItemIds] = useState<string[]>([]);
   const [currentOfferItem, setCurrentOfferItem] = useState<any>(null);
   const [notification, setNotification] = useState<{ type: 'success' | 'error', message: string } | null>(null);
 
@@ -69,9 +71,10 @@ export default function PlanningList({ isSubPage = false }: { isSubPage?: boolea
       suggest: String(suggest),
       status,
       offers,
-      defaultOffer: bestOffer
+      defaultOffer: bestOffer,
+      isManual: manualItemIds.includes(String(item.id))
     };
-  }).filter(item => parseInt(item.suggest) > 0);
+  }).filter(item => parseInt(item.suggest) > 0 || item.isManual);
 
   const getSelectedItemOffer = (itemId: string) => {
     const item = planningItems.find(i => i.id === itemId);
@@ -136,6 +139,7 @@ export default function PlanningList({ isSubPage = false }: { isSubPage?: boolea
 
   const criticalCount = planningItems.filter(i => i.status === 'critical').length;
   const warningCount = planningItems.filter(i => i.status === 'warning').length;
+  const manualCount = planningItems.filter(i => i.isManual).length;
   const estimatedTotal = planningItems.reduce((acc, item) => {
     if (!selectedItems.includes(item.id)) return acc;
     const qty = parseFloat((itemValues[item.id] || '0').replace(',', '.'));
@@ -184,6 +188,12 @@ export default function PlanningList({ isSubPage = false }: { isSubPage?: boolea
           )}
         </div>
         <div className="flex gap-3">
+          <button 
+            onClick={() => setIsManualModalOpen(true)}
+            className="flex items-center gap-2 rounded-lg h-10 px-4 bg-white text-slate-700 font-bold text-sm border border-slate-200 hover:bg-slate-50 transition-colors"
+          >
+            <Plus className="w-4 h-4" /> Incluir Item
+          </button>
           <button className="flex items-center gap-2 rounded-lg h-10 px-4 bg-slate-100 text-slate-700 font-bold text-sm border border-slate-200 hover:bg-slate-200 transition-colors">
             <Filter className="w-4 h-4" /> Filtrar Secretarias
           </button>
@@ -213,6 +223,15 @@ export default function PlanningList({ isSubPage = false }: { isSubPage?: boolea
           <div>
             <p className="text-amber-800 text-[9px] font-bold uppercase tracking-wider">Em Reposição</p>
             <p className="text-amber-600 text-base font-black leading-none">{warningCount} itens</p>
+          </div>
+        </div>
+        <div className="bg-[#359EFF]/5 border border-[#359EFF]/20 p-2.5 rounded-xl flex items-center gap-2.5">
+          <div className="bg-[#359EFF]/10 p-1 rounded-lg text-[#359EFF]">
+            <Plus className="w-4 h-4" />
+          </div>
+          <div>
+            <p className="text-[#359EFF] text-[9px] font-bold uppercase tracking-wider">Inclusão Manual</p>
+            <p className="text-[#359EFF] text-base font-black leading-none">{manualCount} itens</p>
           </div>
         </div>
         <div className="bg-[#359EFF]/5 border border-[#359EFF]/20 p-2.5 rounded-xl flex items-center gap-2.5">
@@ -308,8 +327,13 @@ export default function PlanningList({ isSubPage = false }: { isSubPage?: boolea
                     </td>
                     <td className="px-6 py-5 text-slate-600 font-medium">{item.min}</td>
                     <td className="px-6 py-5 text-right">
-                      <span className="bg-[#359EFF]/10 text-[#359EFF] px-3 py-1.5 rounded-lg text-[11px] font-bold border border-[#359EFF]/20">
-                        {item.suggest}
+                      <span className={cn(
+                        "px-3 py-1.5 rounded-lg text-[11px] font-bold border",
+                        item.isManual 
+                          ? "bg-slate-100 text-slate-500 border-slate-200" 
+                          : "bg-[#359EFF]/10 text-[#359EFF] border-[#359EFF]/20"
+                      )}>
+                        {item.isManual ? 'MANUAL' : item.suggest}
                       </span>
                     </td>
                     <td className="px-6 py-5 text-right">
@@ -398,6 +422,51 @@ export default function PlanningList({ isSubPage = false }: { isSubPage?: boolea
       </div>
 
       <AnimatePresence>
+        {isManualModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200"
+            >
+              <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <div>
+                  <h3 className="text-lg font-black text-slate-900 tracking-tight">Incluir Item Manualmente</h3>
+                  <p className="text-slate-500 text-xs font-medium uppercase tracking-wider">Selecione itens que não estão na lista de reposição</p>
+                </div>
+                <button onClick={() => setIsManualModalOpen(false)} className="p-2 hover:bg-slate-200 rounded-lg transition-colors text-slate-400">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-6 max-h-[60vh] overflow-y-auto space-y-2">
+                {inventoryItems
+                  .filter(item => !planningItems.some(pi => pi.id === String(item.id)))
+                  .map(item => (
+                    <button
+                      key={item.id}
+                      onClick={() => {
+                        setManualItemIds(prev => [...prev, String(item.id)]);
+                        setIsManualModalOpen(false);
+                        setNotification({ type: 'success', message: `${item.item} incluído na lista!` });
+                      }}
+                      className="w-full p-4 rounded-xl border border-slate-200 text-left hover:border-[#359EFF] hover:bg-[#359EFF]/5 transition-all flex items-center justify-between group"
+                    >
+                      <div>
+                        <p className="font-bold text-slate-900">{item.item}</p>
+                        <p className="text-xs text-slate-500">{item.category} | Estoque: {item.current}</p>
+                      </div>
+                      <Plus className="w-5 h-5 text-slate-300 group-hover:text-[#359EFF]" />
+                    </button>
+                  ))}
+                {inventoryItems.filter(item => !planningItems.some(pi => pi.id === String(item.id))).length === 0 && (
+                  <p className="text-center py-8 text-slate-400 italic text-sm">Todos os itens do estoque já estão na lista.</p>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+
         {isOfferModalOpen && currentOfferItem && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
             <motion.div 
