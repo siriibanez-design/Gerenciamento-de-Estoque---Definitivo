@@ -26,7 +26,7 @@ import { cn } from '../lib/utils';
 type MonitoringView = 'hub' | 'productivity' | 'abc' | 'validity' | 'exclusive';
 
 export default function Monitoring({ isSubPage = false }: { isSubPage?: boolean }) {
-  const { items, movements, expirations, addExpiration, updateExpiration, deleteExpiration } = useInventory();
+  const { items, movements, expirations, orders, addExpiration, updateExpiration, deleteExpiration } = useInventory();
   const [view, setView] = useState<MonitoringView>('hub');
   const [searchTerm, setSearchTerm] = useState('');
   
@@ -87,28 +87,42 @@ export default function Monitoring({ isSubPage = false }: { isSubPage?: boolean 
 
   // 2. Curva ABC Logic
   const abcData = useMemo(() => {
-    const data = items.map(item => ({
-      ...item,
-      totalValue: (item.totalOut || 0) * (item.unitPrice || 0)
-    })).sort((a, b) => b.totalValue - a.totalValue);
+    // Sort items by quantity of exits (totalOut)
+    const data = [...items].sort((a, b) => (b.totalOut || 0) - (a.totalOut || 0));
 
-    const totalAccumulatedValue = data.reduce((acc, curr) => acc + curr.totalValue, 0);
+    const totalExits = data.reduce((acc, curr) => acc + (curr.totalOut || 0), 0);
     let runningTotal = 0;
 
     return data.map(item => {
-      runningTotal += item.totalValue;
-      const percentage = totalAccumulatedValue > 0 ? (runningTotal / totalAccumulatedValue) * 100 : 0;
+      runningTotal += (item.totalOut || 0);
+      const percentage = totalExits > 0 ? (runningTotal / totalExits) * 100 : 0;
       
       let category: 'A' | 'B' | 'C' = 'C';
       if (percentage <= 80) category = 'A';
       else if (percentage <= 95) category = 'B';
+      else category = 'C';
 
-      return { ...item, abcCategory: category, percentage };
+      return { 
+        ...item, 
+        abcCategory: category, 
+        percentage,
+        // Keep totalValue for display if needed, but logic is now based on totalOut
+        totalValue: orders
+          .filter(o => o.status === 'ENTREGUE')
+          .reduce((acc, order) => {
+            const orderItem = order.items.find(oi => oi.name === item.item);
+            if (orderItem) {
+              const val = parseFloat(orderItem.value.replace(/[^\d,.-]/g, '').replace(',', '.'));
+              return acc + (isNaN(val) ? 0 : val);
+            }
+            return acc;
+          }, 0)
+      };
     }).filter(item => 
       item.item.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.category.toLowerCase().includes(searchTerm.toLowerCase())
     );
-  }, [items, searchTerm]);
+  }, [items, orders, searchTerm]);
 
   // 3. Validade Logic
   const validityData = useMemo(() => {
@@ -231,14 +245,13 @@ export default function Monitoring({ isSubPage = false }: { isSubPage?: boolean 
     const tableData = abcData.map(item => [
       item.item,
       item.totalOut.toString(),
-      new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.totalValue),
       `${Math.round(item.percentage)}%`,
       item.abcCategory
     ]);
 
     autoTable(doc, {
       startY: 35,
-      head: [['Item', 'Saídas', 'Valor Total', 'Acumulado', 'Classe']],
+      head: [['Item', 'Saídas', 'Acumulado', 'Classe']],
       body: tableData,
       headStyles: { fillColor: [53, 158, 255] }, // Blue color for ABC
       alternateRowStyles: { fillColor: [245, 247, 250] },
@@ -407,18 +420,18 @@ export default function Monitoring({ isSubPage = false }: { isSubPage?: boolean 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div className="bg-emerald-50 p-6 rounded-2xl border border-emerald-100">
           <h4 className="text-emerald-700 text-xs font-black uppercase tracking-widest mb-1">Classe A</h4>
-          <p className="text-2xl font-black text-emerald-900">80% do Valor</p>
-          <p className="text-emerald-600/60 text-[10px] font-bold mt-2 uppercase">Itens de maior importância estratégica</p>
+          <p className="text-2xl font-black text-emerald-900">80% das Saídas</p>
+          <p className="text-emerald-600/60 text-[10px] font-bold mt-2 uppercase">Itens com maior giro de estoque</p>
         </div>
         <div className="bg-amber-50 p-6 rounded-2xl border border-amber-100">
           <h4 className="text-amber-700 text-xs font-black uppercase tracking-widest mb-1">Classe B</h4>
-          <p className="text-2xl font-black text-amber-900">15% do Valor</p>
-          <p className="text-amber-600/60 text-[10px] font-bold mt-2 uppercase">Itens de importância intermediária</p>
+          <p className="text-2xl font-black text-amber-900">15% das Saídas</p>
+          <p className="text-amber-600/60 text-[10px] font-bold mt-2 uppercase">Itens com giro intermediário</p>
         </div>
         <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
           <h4 className="text-slate-700 text-xs font-black uppercase tracking-widest mb-1">Classe C</h4>
-          <p className="text-2xl font-black text-slate-900">5% do Valor</p>
-          <p className="text-emerald-600/60 text-[10px] font-bold mt-2 uppercase">Itens de menor impacto financeiro</p>
+          <p className="text-2xl font-black text-slate-900">5% das Saídas</p>
+          <p className="text-emerald-600/60 text-[10px] font-bold mt-2 uppercase">Itens com menor giro de estoque</p>
         </div>
       </div>
 
@@ -429,7 +442,6 @@ export default function Monitoring({ isSubPage = false }: { isSubPage?: boolean 
               <tr className="bg-slate-50/50">
                 <th className="px-6 py-4 text-slate-700 text-xs font-bold uppercase tracking-wider border-b border-slate-100">Item</th>
                 <th className="px-6 py-4 text-slate-700 text-xs font-bold uppercase tracking-wider border-b border-slate-100">Saídas (Qtd)</th>
-                <th className="px-6 py-4 text-slate-700 text-xs font-bold uppercase tracking-wider border-b border-slate-100">Valor Total</th>
                 <th className="px-6 py-4 text-slate-700 text-xs font-bold uppercase tracking-wider border-b border-slate-100">Acumulado (%)</th>
                 <th className="px-6 py-4 text-slate-700 text-xs font-bold uppercase tracking-wider border-b border-slate-100 text-center">Classe</th>
               </tr>
@@ -441,9 +453,6 @@ export default function Monitoring({ isSubPage = false }: { isSubPage?: boolean 
                     <p className="font-bold text-slate-900 text-sm">{item.item}</p>
                   </td>
                   <td className="px-6 py-4 text-sm text-slate-600 font-medium">{item.totalOut}</td>
-                  <td className="px-6 py-4 text-sm font-bold text-slate-900">
-                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.totalValue)}
-                  </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
                       <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
