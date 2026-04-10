@@ -78,6 +78,14 @@ export interface Cycle {
   uploadHistory: UploadHistory[];
 }
 
+export interface Expiration {
+  id: string;
+  itemId: number;
+  itemName: string;
+  manufacturingDate?: string;
+  date: string;
+}
+
 interface InventoryContextType {
   items: InventoryItem[];
   categories: string[];
@@ -85,6 +93,7 @@ interface InventoryContextType {
   uploadHistory: UploadHistory[];
   orders: Order[];
   processes: Process[];
+  expirations: Expiration[];
   activeCycleId: string | null;
   cycles: Cycle[];
   isCycleClosed: boolean;
@@ -106,6 +115,9 @@ interface InventoryContextType {
   updateOrderStatus: (id: string, status: Order['status']) => void;
   deleteOrder: (id: string) => void;
   updateProcesses: (processes: Process[]) => void;
+  addExpiration: (expiration: Omit<Expiration, 'id'>) => void;
+  updateExpiration: (id: string, expiration: Partial<Expiration>) => void;
+  deleteExpiration: (id: string) => void;
   turnCycle: () => void;
 }
 
@@ -121,23 +133,53 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
   });
 
   const [cycles, setCycles] = useState<Cycle[]>(() => {
-    const saved = localStorage.getItem('inventory_cycles_v4');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem('inventory_cycles_v4');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      console.error('Error loading cycles:', e);
+      return [];
+    }
   });
 
   const [categories, setCategories] = useState<string[]>(() => {
-    const saved = localStorage.getItem('inventory_categories_v4');
-    return saved ? JSON.parse(saved) : initialCategories;
+    try {
+      const saved = localStorage.getItem('inventory_categories_v4');
+      return saved ? JSON.parse(saved) : initialCategories;
+    } catch (e) {
+      console.error('Error loading categories:', e);
+      return initialCategories;
+    }
   });
 
   const [orders, setOrders] = useState<Order[]>(() => {
-    const saved = localStorage.getItem('inventory_orders_v4');
-    return saved ? JSON.parse(saved) : initialOrders;
+    try {
+      const saved = localStorage.getItem('inventory_orders_v4');
+      return saved ? JSON.parse(saved) : initialOrders;
+    } catch (e) {
+      console.error('Error loading orders:', e);
+      return initialOrders;
+    }
   });
 
   const [processes, setProcesses] = useState<Process[]>(() => {
-    const saved = localStorage.getItem('inventory_processes_v4');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem('inventory_processes_v4');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      console.error('Error loading processes:', e);
+      return [];
+    }
+  });
+
+  const [expirations, setExpirations] = useState<Expiration[]>(() => {
+    try {
+      const saved = localStorage.getItem('inventory_expirations_v4');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      console.error('Error loading expirations:', e);
+      return [];
+    }
   });
 
   // Helper to get current cycle data
@@ -163,6 +205,10 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     localStorage.setItem('inventory_processes_v4', JSON.stringify(processes));
   }, [processes]);
+
+  useEffect(() => {
+    localStorage.setItem('inventory_expirations_v4', JSON.stringify(expirations));
+  }, [expirations]);
 
   const setActiveCycle = (id: string) => {
     setActiveCycleId(id);
@@ -431,6 +477,18 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
     setProcesses(newProcesses);
   };
 
+  const addExpiration = (newExp: Omit<Expiration, 'id'>) => {
+    setExpirations(prev => [...prev, { ...newExp, id: Date.now().toString() }]);
+  };
+
+  const updateExpiration = (id: string, updatedFields: Partial<Expiration>) => {
+    setExpirations(prev => prev.map(e => e.id === id ? { ...e, ...updatedFields } : e));
+  };
+
+  const deleteExpiration = (id: string) => {
+    setExpirations(prev => prev.filter(e => e.id !== id));
+  };
+
   const turnCycle = () => {
     if (!activeCycleId) return;
     setCycles(prev => prev.map(c => c.id === activeCycleId ? { ...c, isClosed: true } : c));
@@ -444,6 +502,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       uploadHistory,
       orders,
       processes,
+      expirations,
       activeCycleId,
       cycles,
       isCycleClosed,
@@ -465,6 +524,9 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       updateOrderStatus,
       deleteOrder,
       updateProcesses,
+      addExpiration,
+      updateExpiration,
+      deleteExpiration,
       turnCycle
     }}>
       {children}

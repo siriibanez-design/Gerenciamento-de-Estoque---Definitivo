@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Package, Search, Bell, User, Settings, RefreshCw, AlertTriangle } from 'lucide-react';
-import { cn } from '@/src/lib/utils';
+import { cn } from '../lib/utils';
 import { useInventory } from '../context/InventoryContext';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -17,7 +17,7 @@ export default function Layout({ children }: LayoutProps) {
 
   const navItems = [
     { name: 'Ciclo', isAction: true, hideIfClosed: true, isYellow: true },
-    { name: 'Dashboard', path: '/management-dashboard' },
+    { name: 'Monitoramento', path: '/monitoring' },
     { name: 'Movimentações', path: '/movements' },
     { name: 'Relatórios', path: '/reports' },
     { name: 'Conversão', path: '/conversion' },

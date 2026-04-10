@@ -18,7 +18,7 @@ export default function Login() {
     e.preventDefault();
     if (selectedMonth) {
       setActiveCycle(selectedMonth);
-      navigate('/management-dashboard');
+      navigate('/monitoring');
     }
   };
 
@@ -26,7 +26,7 @@ export default function Login() {
     e.preventDefault();
     if (newMonthName) {
       setActiveCycle(newMonthName);
-      navigate('/management-dashboard');
+      navigate('/monitoring');
     }
   };
 

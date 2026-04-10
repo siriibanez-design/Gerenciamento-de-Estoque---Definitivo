@@ -1,18 +1,19 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Truck, ClipboardList, FileText } from 'lucide-react';
+import { LayoutDashboard, Truck, ClipboardList, FileText, Clock } from 'lucide-react';
 import PurchasingDashboard from './PurchasingDashboard';
 import Suppliers from './Suppliers';
 import PlanningList from './PlanningList';
 import Orders from './Orders';
+import Monitoring from './Monitoring';
 import { cn } from '../lib/utils';
 
-type Tab = 'dashboard' | 'suppliers' | 'list' | 'orders';
+type Tab = 'suppliers' | 'list' | 'orders' | 'monitoring';
 
 export default function Planning() {
-  const [activeTab, setActiveTab] = useState<Tab>('dashboard');
+  const [activeTab, setActiveTab] = useState<Tab>('monitoring');
 
   const tabs = [
-    { id: 'dashboard', label: 'DASHBOARD', icon: LayoutDashboard, color: 'bg-blue-50', textColor: 'text-blue-600', borderColor: 'border-blue-100' },
+    { id: 'monitoring', label: 'MONITORAMENTO', icon: Clock, color: 'bg-rose-50', textColor: 'text-rose-600', borderColor: 'border-rose-100' },
     { id: 'suppliers', label: 'FORNECEDORES', icon: Truck, color: 'bg-amber-50', textColor: 'text-amber-600', borderColor: 'border-amber-100' },
     { id: 'list', label: 'LISTA', icon: ClipboardList, color: 'bg-emerald-50', textColor: 'text-emerald-600', borderColor: 'border-emerald-100' },
     { id: 'orders', label: 'ORDENS DE COMPRAS', icon: FileText, color: 'bg-purple-50', textColor: 'text-purple-600', borderColor: 'border-purple-100' },
@@ -51,10 +52,10 @@ export default function Planning() {
 
       {/* Tab Content */}
       <div className="pt-4">
-        {activeTab === 'dashboard' && <PurchasingDashboard isSubPage />}
         {activeTab === 'suppliers' && <Suppliers isSubPage />}
         {activeTab === 'list' && <PlanningList isSubPage />}
         {activeTab === 'orders' && <Orders isSubPage />}
+        {activeTab === 'monitoring' && <Monitoring isSubPage />}
       </div>
     </div>
   );
